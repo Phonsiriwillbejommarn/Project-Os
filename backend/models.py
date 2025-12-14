@@ -1,0 +1,99 @@
+from sqlalchemy import Column, Integer, String, Float, Text, Enum as SQLEnum, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import enum
+
+Base = declarative_base()
+
+
+# Enums
+class Gender(str, enum.Enum):
+    Male = "Male"
+    Female = "Female"
+
+
+class ActivityLevel(str, enum.Enum):
+    Sedentary = "Sedentary"
+    LightlyActive = "LightlyActive"
+    ModeratelyActive = "ModeratelyActive"
+    VeryActive = "VeryActive"
+    ExtraActive = "ExtraActive"
+
+
+class Goal(str, enum.Enum):
+    LoseWeight = "LoseWeight"
+    MaintainWeight = "MaintainWeight"
+    GainMuscle = "GainMuscle"
+
+
+class MessageRole(str, enum.Enum):
+    user = "user"
+    model = "model"
+
+
+# Models
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), unique=True, nullable=False)
+    password = Column(String(50), nullable=False)  # Storing plain text as requested
+    name = Column(String(100), nullable=False)
+    age = Column(Integer, nullable=False)
+    gender = Column(SQLEnum(Gender), nullable=False)
+    weight = Column(Float, nullable=False)  # kg
+    height = Column(Float, nullable=False)  # cm
+    activity_level = Column(SQLEnum(ActivityLevel), nullable=False)
+    goal = Column(SQLEnum(Goal), nullable=False)
+    conditions = Column(Text, default="")  # Comma separated medical conditions
+    dietary_restrictions = Column(Text, default="")
+    target_timeline = Column(String(50), nullable=True)
+    ai_assessment = Column(Text, nullable=True)
+    target_calories = Column(Float, nullable=True)
+    target_protein = Column(Float, nullable=True)
+    target_carbs = Column(Float, nullable=True)
+    target_fat = Column(Float, nullable=True)
+    daily_tips = Column(Text, default="[]") # JSON string of tips
+
+
+class FoodItem(Base):
+    __tablename__ = "food_items"
+
+    id = Column(String(50), primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    name = Column(String(200), nullable=False)
+    calories = Column(Float, nullable=False)
+    protein = Column(Float, nullable=False)
+    carbs = Column(Float, nullable=False)
+    fat = Column(Float, nullable=False)
+    date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    timestamp = Column(Integer, nullable=False)
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(String(50), primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    role = Column(SQLEnum(MessageRole), nullable=False)
+    text = Column(Text, nullable=False)
+    image = Column(Text, nullable=True)  # Base64 string
+    timestamp = Column(Integer, nullable=False)
+
+
+# Database setup
+DATABASE_URL = "sqlite:///./nutrifriend.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

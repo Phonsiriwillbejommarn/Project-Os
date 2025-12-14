@@ -1,0 +1,300 @@
+import React, { useState, useEffect } from 'react';
+import { UserProfile, FoodItem, DailyStats } from './types';
+import Onboarding from './components/Onboarding';
+import Login from './components/Login';
+import Dashboard from './components/Dashboard';
+import ChatAssistant from './components/ChatAssistant';
+import { LayoutDashboard, MessageSquare, Leaf, Calendar, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
+
+const App: React.FC = () => {
+  // --- State ---
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [foodLogs, setFoodLogs] = useState<FoodItem[]>([]);
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'chat'>('dashboard');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Date State for History
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // --- Effects ---
+  // --- Effects ---
+  useEffect(() => {
+    // Check for logged in user
+    const checkAuth = async () => {
+      const storedUserId = localStorage.getItem('nutrifriend_user_id');
+      if (storedUserId) {
+        try {
+          // Fetch user profile
+          const userRes = await fetch(`http://localhost:8000/users/${storedUserId}`);
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            // Convert backend snake_case to frontend camelCase
+            const profile: UserProfile = {
+              id: userData.id,
+              username: userData.username,
+              name: userData.name,
+              age: userData.age,
+              gender: userData.gender,
+              weight: userData.weight,
+              height: userData.height,
+              activityLevel: userData.activity_level,
+              goal: userData.goal,
+              conditions: userData.conditions,
+              dietaryRestrictions: userData.dietary_restrictions,
+              targetTimeline: userData.target_timeline,
+              aiAssessment: userData.ai_assessment,
+              targetCalories: userData.target_calories,
+              targetProtein: userData.target_protein,
+              targetCarbs: userData.target_carbs,
+              targetFat: userData.target_fat,
+              dailyTips: userData.daily_tips ? JSON.parse(userData.daily_tips) : []
+            };
+            setUserProfile(profile);
+
+            // Fetch food logs
+            const foodRes = await fetch(`http://localhost:8000/users/${storedUserId}/foods`);
+            if (foodRes.ok) {
+              const foodData = await foodRes.json();
+              setFoodLogs(foodData);
+            }
+          } else {
+            // Invalid user id, clear storage
+            localStorage.removeItem('nutrifriend_user_id');
+          }
+        } catch (error) {
+          console.error("Failed to fetch user data", error);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  // --- Handlers ---
+  const handleLogin = async (user: UserProfile) => {
+    // User object from Login component (response from backend)
+    // Need to map it to frontend structure if it comes directly from backend
+    const profile: UserProfile = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      age: user.age,
+      gender: user.gender,
+      weight: user.weight,
+      height: user.height,
+      activityLevel: (user as any).activity_level || user.activityLevel,
+      goal: user.goal,
+      conditions: user.conditions,
+      dietaryRestrictions: (user as any).dietary_restrictions || user.dietaryRestrictions,
+      targetTimeline: (user as any).target_timeline || user.targetTimeline,
+      aiAssessment: (user as any).ai_assessment || user.aiAssessment,
+      targetCalories: (user as any).target_calories || user.targetCalories,
+      targetProtein: (user as any).target_protein || user.targetProtein,
+      targetCarbs: (user as any).target_carbs || user.targetCarbs,
+      targetFat: (user as any).target_fat || user.targetFat,
+      dailyTips: (user as any).daily_tips ? JSON.parse((user as any).daily_tips) : []
+    };
+
+    setUserProfile(profile);
+    if (profile.id) {
+      localStorage.setItem('nutrifriend_user_id', profile.id.toString());
+
+      // Fetch logs
+      try {
+        const foodRes = await fetch(`http://localhost:8000/users/${profile.id}/foods`);
+        if (foodRes.ok) {
+          const foodData = await foodRes.json();
+          setFoodLogs(foodData);
+        }
+      } catch (e) {
+        console.error("Error fetching logs", e);
+      }
+    }
+    setCurrentTab('dashboard');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('nutrifriend_user_id');
+    setUserProfile(null);
+    setFoodLogs([]);
+    setAuthMode('login');
+  };
+
+  const handleOnboardingComplete = (profile: UserProfile) => {
+    alert("ลงทะเบียนสำเร็จ! กรุณาเข้าสู่ระบบ");
+    setAuthMode('login');
+  };
+
+  const handleAddFoodLog = async (log: FoodItem) => {
+    if (!userProfile?.id) return;
+
+    try {
+      const response = await fetch(`http://localhost:8000/users/${userProfile.id}/foods`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(log),
+      });
+
+      if (response.ok) {
+        const newLog = await response.json();
+        setFoodLogs(prev => [newLog, ...prev]);
+      }
+    } catch (error) {
+      console.error("Failed to add log", error);
+      // Optimistic update fallback
+      setFoodLogs(prev => [log, ...prev]);
+    }
+  };
+
+  const handleRemoveFoodLog = async (id: string) => {
+    if (!userProfile?.id) return;
+
+    try {
+      await fetch(`http://localhost:8000/users/${userProfile.id}/foods/${id}`, {
+        method: 'DELETE',
+      });
+      setFoodLogs(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error("Failed to delete log", error);
+    }
+  };
+
+  const changeDate = (offset: number) => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() + offset);
+    setSelectedDate(date.toISOString().split('T')[0]);
+  };
+
+  // --- Computed Stats ---
+  // Filter logs based on SELECTED DATE
+  const currentLogs = foodLogs.filter(log => log.date === selectedDate);
+
+  const dailyStats: DailyStats = currentLogs.reduce((acc, curr) => ({
+    calories: acc.calories + curr.calories,
+    protein: acc.protein + curr.protein,
+    carbs: acc.carbs + curr.carbs,
+    fat: acc.fat + curr.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+  // --- Render ---
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50">Loading...</div>;
+  }
+
+  if (!userProfile) {
+    if (authMode === 'login') {
+      return <Login onLogin={handleLogin} onRegisterClick={() => setAuthMode('register')} />;
+    } else {
+      return <Onboarding onComplete={handleOnboardingComplete} onLoginClick={() => setAuthMode('login')} />;
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-['Prompt']">
+
+      {/* Sidebar / Mobile Nav */}
+      <nav className="md:w-64 bg-white shadow-lg z-10 flex flex-col fixed md:relative bottom-0 w-full md:h-screen h-16 md:border-r border-t md:border-t-0 border-gray-100">
+        <div className="hidden md:block p-6">
+          <h1 className="text-2xl font-bold text-emerald-600 flex items-center">
+            <Leaf className="w-8 h-8 mr-2" />
+            NutriFriend
+          </h1>
+          <p className="text-sm text-gray-500 mt-2">สวัสดี, {userProfile.name}</p>
+        </div>
+
+        <div className="flex md:flex-col justify-around md:justify-start md:px-4 md:space-y-2 w-full h-full md:h-auto items-center md:items-stretch">
+          <button
+            onClick={() => setCurrentTab('dashboard')}
+            className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'dashboard' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
+          >
+            <LayoutDashboard className="w-6 h-6 md:mr-3" />
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">ภาพรวม</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('chat')}
+            className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'chat' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
+          >
+            <MessageSquare className="w-6 h-6 md:mr-3" />
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">AI Chat</span>
+          </button>
+        </div>
+
+        <div className="hidden md:block p-6 mt-auto">
+          <div className="bg-emerald-50 p-4 rounded-xl text-xs text-emerald-800 mb-4">
+            <p className="font-semibold mb-1 flex items-center">
+              <Lightbulb className="w-3 h-3 mr-1" />
+              เคล็ดลับวันนี้
+            </p>
+            {userProfile.dailyTips && userProfile.dailyTips.length > 0 ? (
+              <p>{userProfile.dailyTips[new Date().getDay() % userProfile.dailyTips.length]}</p>
+            ) : (
+              <p>อย่าลืมดื่มน้ำให้เพียงพอ อย่างน้อยวันละ 8 แก้วนะครับ!</p>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full text-left text-sm text-red-500 hover:text-red-600 font-medium"
+          >
+            ออกจากระบบ
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto mb-16 md:mb-0 max-w-7xl mx-auto w-full">
+
+        {/* Date Navigator Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">
+              {currentTab === 'dashboard' ? 'Dashboard สุขภาพ' : 'ห้องแชทโภชนาการ'}
+            </h2>
+            <p className="text-gray-500 text-sm hidden sm:block">ดูแลสุขภาพของคุณในทุกๆ วัน</p>
+          </div>
+
+          <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+            <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center px-4 border-x border-gray-100">
+              <Calendar className="w-4 h-4 text-emerald-500 mr-2" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-sm font-medium text-gray-700 focus:outline-none bg-transparent"
+              />
+            </div>
+            <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {currentTab === 'dashboard' ? (
+          <Dashboard
+            user={userProfile}
+            stats={dailyStats}
+            allLogs={foodLogs}
+            selectedDate={selectedDate}
+            currentLogs={currentLogs}
+            onAddLog={handleAddFoodLog}
+            onRemoveLog={handleRemoveFoodLog}
+            navigateToChat={() => setCurrentTab('chat')}
+          />
+        ) : (
+          <div className="h-full flex flex-col">
+            <ChatAssistant userProfile={userProfile} foodLogs={currentLogs} />
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default App;
