@@ -12,10 +12,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
     username: '',
     password: '',
     name: '',
-    age: 25,
+    age: '' as any, // Initialize as empty string for UI, will be parsed as number
     gender: Gender.Male,
-    weight: 60,
-    height: 170,
+    weight: '' as any,
+    height: '' as any,
     activityLevel: ActivityLevel.ModeratelyActive,
     goal: Goal.LoseWeight,
     conditions: '',
@@ -83,7 +83,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
           <p className="text-emerald-100">เราจะช่วยดูแลสุขภาพของคุณให้ดีที่สุด กรุณาให้ข้อมูลเบื้องต้น</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="p-8 space-y-6" autoComplete="off">
 
           {/* Personal Info */}
           <div className="space-y-4">
@@ -101,6 +101,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                     className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     placeholder="สำหรับเข้าสู่ระบบ"
                     required
+                    autoComplete="off"
                   />
                 </div>
                 <div>
@@ -112,6 +113,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                     className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     placeholder="รหัสผ่านของคุณ"
                     required
+                    autoComplete="new-password"
                   />
                 </div>
               </div>
@@ -125,6 +127,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                   className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   placeholder="เช่น มิ้นท์"
                   required
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -132,8 +135,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                 <input
                   type="number"
                   value={formData.age}
-                  onChange={(e) => handleChange('age', parseInt(e.target.value))}
+                  onChange={(e) => handleChange('age', e.target.value === '' ? '' : parseInt(e.target.value))}
                   className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="ระบุอายุ"
                 />
               </div>
               <div>
@@ -141,8 +145,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                 <input
                   type="number"
                   value={formData.weight}
-                  onChange={(e) => handleChange('weight', parseFloat(e.target.value))}
+                  onChange={(e) => handleChange('weight', e.target.value === '' ? '' : parseFloat(e.target.value))}
                   className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="ระบุน้ำหนัก"
                 />
               </div>
               <div>
@@ -150,8 +155,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                 <input
                   type="number"
                   value={formData.height}
-                  onChange={(e) => handleChange('height', parseFloat(e.target.value))}
+                  onChange={(e) => handleChange('height', e.target.value === '' ? '' : parseFloat(e.target.value))}
                   className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="ระบุส่วนสูง"
                 />
               </div>
               <div>
