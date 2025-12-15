@@ -37,7 +37,7 @@ class UserProfile(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False)
-    password = Column(String(50), nullable=False)  # Storing plain text as requested
+    password = Column(String(50), nullable=False)  # plain text (ตามที่ส้มทำไว้)
     name = Column(String(100), nullable=False)
     age = Column(Integer, nullable=False)
     gender = Column(SQLEnum(Gender), nullable=False)
@@ -45,7 +45,7 @@ class UserProfile(Base):
     height = Column(Float, nullable=False)  # cm
     activity_level = Column(SQLEnum(ActivityLevel), nullable=False)
     goal = Column(SQLEnum(Goal), nullable=False)
-    conditions = Column(Text, default="")  # Comma separated medical conditions
+    conditions = Column(Text, default="")
     dietary_restrictions = Column(Text, default="")
     target_timeline = Column(String(50), nullable=True)
     ai_assessment = Column(Text, nullable=True)
@@ -53,7 +53,7 @@ class UserProfile(Base):
     target_protein = Column(Float, nullable=True)
     target_carbs = Column(Float, nullable=True)
     target_fat = Column(Float, nullable=True)
-    daily_tips = Column(Text, default="[]") # JSON string of tips
+    daily_tips = Column(Text, default="[]")  # JSON string
 
 
 class FoodItem(Base):
@@ -77,8 +77,9 @@ class Message(Base):
     user_id = Column(Integer, nullable=False)
     role = Column(SQLEnum(MessageRole), nullable=False)
     text = Column(Text, nullable=False)
-    image = Column(Text, nullable=True)  # Base64 string
+    image = Column(Text, nullable=True)
     timestamp = Column(Integer, nullable=False)
+    date = Column(String(10), nullable=False)  # ✅ YYYY-MM-DD
 
 
 # Database setup

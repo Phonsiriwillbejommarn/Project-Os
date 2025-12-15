@@ -76,6 +76,7 @@ class MessageCreate(BaseModel):
     text: str
     image: Optional[str] = None
     timestamp: int
+    date: str  # ✅ ต้องส่งมาจาก frontend
 
 
 class MessageResponse(MessageCreate):

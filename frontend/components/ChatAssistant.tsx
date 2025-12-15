@@ -1,199 +1,278 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Message, UserProfile, FoodItem } from '../types';
-import { sendMessageToGemini } from '../services/geminiService';
-import { Send, Bot, User as UserIcon, Loader2, Image as ImageIcon, X, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { Message, UserProfile, FoodItem } from "../types";
+import { Send, Bot, User as UserIcon, Loader2, Image as ImageIcon, X, Trash2 } from "lucide-react";
 
 interface ChatAssistantProps {
   userProfile: UserProfile;
   foodLogs: FoodItem[];
+  selectedDate: string;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs }) => {
+const API_BASE = "http://localhost:8000";
+
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, selectedDate }) => {
+  const userId = userProfile.id;
+
   const INITIAL_MESSAGE: Message = {
-      id: 'welcome',
-      role: 'model',
-      text: `สวัสดีครับคุณ ${userProfile.name}! ผมคือ NutriFriend เพื่อนคู่คิดด้านโภชนาการของคุณ วันนี้มีอะไรให้ช่วยไหมครับ? 
-      
-📸 คุณสามารถส่งรูปอาหารเพื่อให้ผมช่วยวิเคราะห์แคลอรี่และสารอาหารได้นะครับ
-📊 ผมสามารถดูข้อมูลอาหารที่คุณบันทึกในวันนี้เพื่อแนะนำเพิ่มเติมได้ด้วยครับ`,
-      timestamp: Date.now()
-    };
+    id: "welcome",
+    role: "model",
+    text: `สวัสดีครับคุณ ${userProfile.name}! 👋
+ผมคือ NutriFriend เพื่อนคู่คิดด้านโภชนาการของคุณ
+
+📸 ส่งรูปอาหารให้ผมช่วยวิเคราะห์ได้
+📊 ผมดูข้อมูลอาหารที่คุณบันทึกวันนี้เพื่อแนะนำเพิ่มเติมได้ครับ`,
+    timestamp: Date.now(),
+    date: selectedDate,
+  };
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
+  const [input, setInput] = useState("");
+
+  // แยก preview กับ base64
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load chat history from localStorage on mount
+  /* ---------------- Load messages from DB (by date) ---------------- */
   useEffect(() => {
-    const savedChat = localStorage.getItem(`nutrifriend_chat_${userProfile.name}`);
-    if (savedChat) {
+    const loadMessages = async () => {
+      if (!userId) return;
+
       try {
-        setMessages(JSON.parse(savedChat));
-      } catch (e) {
+        const res = await fetch(`${API_BASE}/users/${userId}/messages?date=${selectedDate}`);
+        if (!res.ok) throw new Error("load failed");
+
+        const data: Message[] = await res.json();
+        setMessages(data && data.length ? data : [INITIAL_MESSAGE]);
+      } catch {
         setMessages([INITIAL_MESSAGE]);
       }
-    } else {
-      setMessages([INITIAL_MESSAGE]);
-    }
-  }, [userProfile.name]);
+    };
 
-  // Save chat history whenever messages change
+    loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, selectedDate]);
+
+  /* ---------------- Auto scroll ---------------- */
   useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(`nutrifriend_chat_${userProfile.name}`, JSON.stringify(messages));
-    }
-    scrollToBottom();
-  }, [messages, userProfile.name]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  /* ---------------- Clear chat (this date only) ---------------- */
+  const handleClearHistory = async () => {
+    if (!userId) return;
+    if (!window.confirm(`ลบประวัติแชทวันที่ ${selectedDate} ใช่หรือไม่?`)) return;
+
+    try {
+      await fetch(`${API_BASE}/users/${userId}/messages?date=${selectedDate}`, { method: "DELETE" });
+    } catch {}
+
+    setMessages([INITIAL_MESSAGE]);
   };
 
-  const handleClearHistory = () => {
-    if (window.confirm('คุณต้องการลบประวัติการสนทนาทั้งหมดใช่หรือไม่?')) {
-      setMessages([INITIAL_MESSAGE]);
-      localStorage.removeItem(`nutrifriend_chat_${userProfile.name}`);
-    }
-  };
-
+  /* ---------------- Image handling ---------------- */
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-    // Reset input so same file can be selected again if needed
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (!file) return;
+
+    // preview ทันที
+    const previewUrl = URL.createObjectURL(file);
+    setSelectedImagePreview(previewUrl);
+
+    // base64 สำหรับส่ง backend
+    const reader = new FileReader();
+    reader.onloadend = () => setSelectedImageBase64(reader.result as string);
+    reader.readAsDataURL(file);
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRemoveImage = () => {
-    setSelectedImage(undefined);
+    if (selectedImagePreview) URL.revokeObjectURL(selectedImagePreview);
+    setSelectedImagePreview(null);
+    setSelectedImageBase64(null);
   };
 
-  const handleSend = async () => {
-    if ((!input.trim() && !selectedImage) || isLoading) return;
+  /* ---------------- Save message to DB helper ---------------- */
+  const saveMessageToDB = async (msg: Message) => {
+    if (!userId) return;
 
-    // Prepare User Message
+    await fetch(`${API_BASE}/users/${userId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: msg.id,
+        role: msg.role,
+        text: msg.text,
+        image: msg.image ?? null,
+        timestamp: msg.timestamp,
+        date: selectedDate,
+      }),
+    });
+  };
+
+  /* ---------------- Helper: get readable error message ---------------- */
+  const buildErrorMessage = async (res: Response) => {
+    // พยายามอ่าน detail จาก backend
+    let detail = "";
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = String(body.detail);
+    } catch {
+      // ignore JSON parse errors
+    }
+
+    if (res.status === 409) {
+      return "⏳ NutriFriend กำลังคิดคำตอบอยู่แล้วนะ ห้ามกดซ้ำ รอสักครู่แล้วค่อยส่งใหม่อีกทีครับ";
+    }
+    if (res.status === 429) {
+      return "🚦 ส่งถี่เกินไป (429) กรุณารอสักครู่แล้วลองใหม่ครับ";
+    }
+    if (res.status === 503) {
+      return "😵‍💫 AI มีคนใช้งานเยอะ (503) ลองใหม่อีกครั้งในอีกสักครู่ครับ";
+    }
+    if (res.status === 500) {
+      return detail ? `❌ ${detail}` : "❌ Server มีปัญหา ลองใหม่อีกครั้งครับ";
+    }
+
+    // fallback
+    return detail ? `❌ ${detail}` : "❌ ไม่สามารถตอบได้ในขณะนี้ กรุณาลองใหม่";
+  };
+
+  /* ---------------- Send message ---------------- */
+  const handleSend = async () => {
+    if ((!input.trim() && !selectedImageBase64) || isLoading || !userId) return;
+
     const userMsg: Message = {
       id: Date.now().toString(),
-      role: 'user',
+      role: "user",
       text: input.trim(),
-      image: selectedImage,
-      timestamp: Date.now()
+      image: selectedImageBase64 ?? undefined,
+      timestamp: Date.now(),
+      date: selectedDate,
     };
 
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setSelectedImage(undefined);
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    handleRemoveImage();
     setIsLoading(true);
 
     try {
-      // Pass text, image, profile, AND foodLogs to the service
-      const responseText = await sendMessageToGemini(userMsg.text, userMsg.image, userProfile, foodLogs);
-      
+      // ✅ 1) บันทึกข้อความ user ลง DB
+      await saveMessageToDB(userMsg);
+
+      // ✅ 2) คุยกับ AI
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMsg.text,
+          image: userMsg.image,
+          profile: userProfile,
+          foodLogs,
+        }),
+      });
+
+      if (!res.ok) {
+        const msg = await buildErrorMessage(res);
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: responseText,
-        timestamp: Date.now()
+        role: "model",
+        text: data.response,
+        timestamp: Date.now(),
+        date: selectedDate,
       };
-      
-      setMessages(prev => [...prev, aiMsg]);
-    } catch (error) {
-      console.error(error);
+
+      setMessages((prev) => [...prev, aiMsg]);
+
+      // ✅ 3) บันทึกข้อความ AI ลง DB
+      await saveMessageToDB(aiMsg);
+    } catch (err: any) {
       const errorMsg: Message = {
-         id: Date.now().toString(),
-         role: 'model',
-         text: 'ขออภัย เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง',
-         timestamp: Date.now()
+        id: Date.now().toString(),
+        role: "model",
+        text: err?.message || "❌ ไม่สามารถวิเคราะห์/ตอบได้ กรุณาลองใหม่",
+        timestamp: Date.now(),
+        date: selectedDate,
       };
-      setMessages(prev => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, errorMsg]);
+
+      // ถ้าอยากให้ error ถูกเก็บด้วย ให้เปิดบรรทัดนี้
+      // await saveMessageToDB(errorMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
+  /* ---------------- UI ---------------- */
   return (
-    <div className="flex flex-col h-[600px] bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className="bg-emerald-600 p-4 text-white flex items-center justify-between">
-        <div className="flex items-center">
-          <Bot className="w-6 h-6 mr-2" />
-          <h3 className="font-semibold">Chat with NutriFriend AI</h3>
+    <div className="flex flex-col h-[600px] bg-white rounded-2xl border shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="bg-emerald-600 p-4 text-white flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <Bot size={20} />
+          <h3 className="font-semibold">NutriFriend AI</h3>
         </div>
-        <button 
-          onClick={handleClearHistory}
-          className="text-emerald-100 hover:text-white p-1 hover:bg-emerald-500 rounded-lg transition"
-          title="ล้างประวัติแชท"
-        >
-          <Trash2 className="w-4 h-4" />
+        <button onClick={handleClearHistory} title="ลบแชทของวันนั้น" className="opacity-90 hover:opacity-100">
+          <Trash2 size={18} />
         </button>
       </div>
-      
+
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
         {messages.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[80%] rounded-2xl p-4 shadow-sm ${
-              msg.role === 'user' 
-                ? 'bg-emerald-600 text-white rounded-br-none' 
-                : 'bg-white text-gray-800 rounded-bl-none border border-slate-100'
-            }`}>
-              <div className="flex items-center gap-2 mb-1 opacity-80 text-xs">
-                {msg.role === 'user' ? <UserIcon size={12}/> : <Bot size={12}/>}
-                <span>{msg.role === 'user' ? 'คุณ' : 'NutriFriend'}</span>
+          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`max-w-[80%] p-4 rounded-2xl text-sm shadow ${
+                msg.role === "user" ? "bg-emerald-600 text-white" : "bg-white border"
+              }`}
+            >
+              <div className="text-xs opacity-70 flex items-center gap-1 mb-1">
+                {msg.role === "user" ? <UserIcon size={12} /> : <Bot size={12} />}
+                {msg.role === "user" ? "คุณ" : "NutriFriend"}
               </div>
-              
-              {/* Image Rendering */}
-              {msg.image && (
-                <div className="mb-2">
-                  <img 
-                    src={msg.image} 
-                    alt="User uploaded" 
-                    className="max-w-full rounded-lg border border-emerald-500/20 max-h-60 object-cover"
-                  />
-                </div>
-              )}
 
-              <div className="whitespace-pre-wrap leading-relaxed text-sm">
-                {msg.text}
-              </div>
+              {msg.image && <img src={msg.image} alt="uploaded" className="rounded-lg mb-2 max-h-60" />}
+
+              <div className="whitespace-pre-wrap">{msg.text}</div>
             </div>
           </div>
         ))}
+
         {isLoading && (
-          <div className="flex justify-start">
-             <div className="bg-white text-gray-800 rounded-2xl rounded-bl-none border border-slate-100 p-4 shadow-sm flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-                <span className="text-sm text-gray-500">NutriFriend กำลังวิเคราะห์...</span>
-             </div>
+          <div className="flex gap-2 items-center text-gray-500 text-sm">
+            <Loader2 className="animate-spin" size={16} />
+            NutriFriend กำลังคิด...
           </div>
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-white border-t border-slate-100">
-        {/* Image Preview */}
-        {selectedImage && (
-          <div className="mb-2 flex items-center gap-2">
+      {/* Input */}
+      <div className="p-4 border-t bg-white">
+        {/* Preview */}
+        {selectedImagePreview && (
+          <div className="mb-3 flex items-center gap-2">
             <div className="relative">
-              <img 
-                src={selectedImage} 
-                alt="Selected" 
+              <img
+                src={selectedImagePreview}
+                alt="preview"
                 className="h-16 w-16 object-cover rounded-lg border border-gray-200"
               />
-              <button 
+              <button
                 onClick={handleRemoveImage}
                 className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition"
+                title="ลบรูป"
               >
                 <X size={12} />
               </button>
@@ -203,37 +282,33 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs }) 
         )}
 
         <div className="flex gap-2 items-center">
-          <input 
-            type="file" 
-            ref={fileInputRef}
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
+          <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleImageSelect} />
+
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-            title="แนบรูปภาพ"
+            className="p-2 rounded-full hover:bg-emerald-50 text-gray-500 hover:text-emerald-600 transition"
             disabled={isLoading}
+            title="แนบรูป"
           >
-            <ImageIcon className="w-6 h-6" />
+            <ImageIcon />
           </button>
 
           <input
-            type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={selectedImage ? "ถามเพิ่มเติมเกี่ยวกับรูปนี้..." : "ถามเกี่ยวกับอาหาร..."}
-            className="flex-1 border border-gray-200 rounded-full px-4 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            className="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder={selectedImagePreview ? "ถามเพิ่มเติมเกี่ยวกับรูปนี้..." : "ถามเกี่ยวกับอาหาร..."}
             disabled={isLoading}
           />
+
           <button
             onClick={handleSend}
-            disabled={isLoading || (!input.trim() && !selectedImage)}
-            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white p-2 rounded-full transition-all"
+            disabled={isLoading || (!input.trim() && !selectedImageBase64)}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white p-2 rounded-full transition"
+            title="ส่ง"
           >
-            <Send className="w-5 h-5" />
+            <Send />
           </button>
         </div>
       </div>

@@ -1,21 +1,20 @@
-
 export enum Gender {
-  Male = 'Male',
-  Female = 'Female'
+  Male = "Male",
+  Female = "Female",
 }
 
 export enum ActivityLevel {
-  Sedentary = 'Sedentary', // Little or no exercise
-  LightlyActive = 'LightlyActive', // Light exercise 1-3 days/week
-  ModeratelyActive = 'ModeratelyActive', // Moderate exercise 3-5 days/week
-  VeryActive = 'VeryActive', // Hard exercise 6-7 days/week
-  ExtraActive = 'ExtraActive' // Very hard exercise & physical job
+  Sedentary = "Sedentary",
+  LightlyActive = "LightlyActive",
+  ModeratelyActive = "ModeratelyActive",
+  VeryActive = "VeryActive",
+  ExtraActive = "ExtraActive",
 }
 
 export enum Goal {
-  LoseWeight = 'LoseWeight',
-  MaintainWeight = 'MaintainWeight',
-  GainMuscle = 'GainMuscle'
+  LoseWeight = "LoseWeight",
+  MaintainWeight = "MaintainWeight",
+  GainMuscle = "GainMuscle",
 }
 
 export interface UserProfile {
@@ -25,11 +24,11 @@ export interface UserProfile {
   name: string;
   age: number;
   gender: Gender;
-  weight: number; // kg
-  height: number; // cm
+  weight: number;
+  height: number;
   activityLevel: ActivityLevel;
   goal: Goal;
-  conditions: string; // Comma separated string of medical conditions
+  conditions: string;
   dietaryRestrictions: string;
   targetTimeline?: string;
   aiAssessment?: string;
@@ -47,16 +46,17 @@ export interface FoodItem {
   protein: number;
   carbs: number;
   fat: number;
-  date: string; // ISO Date string YYYY-MM-DD
+  date: string; // YYYY-MM-DD
   timestamp: number;
 }
 
 export interface Message {
   id: string;
-  role: 'user' | 'model';
+  role: "user" | "model";
   text: string;
-  image?: string; // Base64 string of the uploaded image
+  image?: string; // base64
   timestamp: number;
+  date?: string; // ✅ เพิ่ม (ใช้ตอนส่งเข้า DB)
 }
 
 export interface DailyStats {
