@@ -1,7 +1,7 @@
 import React from 'react';
 import { UserProfile, DailyStats, Goal, Gender, ActivityLevel, FoodItem } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine } from 'recharts';
-import { Target, Utensils, CheckCircle, CalendarDays,Sparkles } from 'lucide-react';
+import { Target, Utensils, CheckCircle, CalendarDays, Sparkles } from 'lucide-react';
 import FoodLogger from './FoodLogger';
 import ReactMarkdown from 'react-markdown';
 
@@ -82,7 +82,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // --- Pie Chart Data ---
   const data = [
-    { name: 'Carbs', value: stats.carbs, color: '#FBBF24' },   // Amber
+    { name: 'Carbs', value: stats.carbs, color: '#FBBF24' },    // Amber
     { name: 'Protein', value: stats.protein, color: '#34D399' }, // Emerald
     { name: 'Fat', value: stats.fat, color: '#F87171' },        // Red
   ];
@@ -189,18 +189,18 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="lg:col-span-1 space-y-6">
           {/* AI Assessment Card */}
           {user.aiAssessment && (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
               <h3 className="text-lg font-semibold text-emerald-700 mb-4 flex items-center">
                 <Sparkles className="w-5 h-5 mr-2" />
                 แผนโภชนาการส่วนตัว
               </h3>
-              <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto prose prose-emerald prose-sm">
+
+              {/* ✅ ลดความสูง: max-h-96 -> max-h-56 เพื่อให้การ์ดถัดไปแสดงโดยไม่ต้องเลื่อน */}
+              <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed max-h-20 overflow-y-auto prose prose-emerald prose-sm">
                 <ReactMarkdown>{user.aiAssessment}</ReactMarkdown>
               </div>
             </div>
           )}
-
-
 
           {/* Daily Nutrition Card (Pie Chart) */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-fit">
@@ -254,13 +254,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          
-          
         </div>
       </div>
-
-      {/* 3. Bottom: Weekly Summary (Bar Chart) */}
-
 
     </div>
   );
