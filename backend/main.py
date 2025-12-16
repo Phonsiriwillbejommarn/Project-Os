@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -605,3 +607,28 @@ async def chat_with_ai(request: ChatRequest, req: Request):
         return ChatResponse(response=text)
     finally:
         inflight_release(key)
+
+# ============================================================
+# Serve Frontend (Static Files) - MUST BE LAST
+# ============================================================
+
+# Mount static files (JS, CSS, Images)
+# Check if dist folder exists (it should be in ../frontend/dist relative to backend)
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
+if os.path.exists(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+    # Catch-all route for SPA (React Router)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # API routes are already handled above because they are defined first
+        # If path is a file in dist, serve it
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        
+        # Otherwise serve index.html (for client-side routing)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+else:
+    print(f"WARNING: Frontend dist folder not found at {FRONTEND_DIST}")
