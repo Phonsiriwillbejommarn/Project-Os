@@ -4,7 +4,15 @@ import Onboarding from './components/Onboarding';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ChatAssistant from './components/ChatAssistant';
-import { LayoutDashboard, MessageSquare, Leaf, Calendar, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Leaf,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Lightbulb
+} from 'lucide-react';
 
 const App: React.FC = () => {
   // --- State ---
@@ -18,18 +26,15 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // --- Effects ---
-  // --- Effects ---
   useEffect(() => {
-    // Check for logged in user
     const checkAuth = async () => {
       const storedUserId = localStorage.getItem('nutrifriend_user_id');
       if (storedUserId) {
         try {
-          // Fetch user profile
           const userRes = await fetch(`http://localhost:8000/users/${storedUserId}`);
           if (userRes.ok) {
             const userData = await userRes.json();
-            // Convert backend snake_case to frontend camelCase
+
             const profile: UserProfile = {
               id: userData.id,
               username: userData.username,
@@ -50,16 +55,15 @@ const App: React.FC = () => {
               targetFat: userData.target_fat,
               dailyTips: userData.daily_tips ? JSON.parse(userData.daily_tips) : []
             };
+
             setUserProfile(profile);
 
-            // Fetch food logs
             const foodRes = await fetch(`http://localhost:8000/users/${storedUserId}/foods`);
             if (foodRes.ok) {
               const foodData = await foodRes.json();
               setFoodLogs(foodData);
             }
           } else {
-            // Invalid user id, clear storage
             localStorage.removeItem('nutrifriend_user_id');
           }
         } catch (error) {
@@ -74,8 +78,6 @@ const App: React.FC = () => {
 
   // --- Handlers ---
   const handleLogin = async (user: UserProfile) => {
-    // User object from Login component (response from backend)
-    // Need to map it to frontend structure if it comes directly from backend
     const profile: UserProfile = {
       id: user.id,
       username: user.username,
@@ -98,10 +100,10 @@ const App: React.FC = () => {
     };
 
     setUserProfile(profile);
+
     if (profile.id) {
       localStorage.setItem('nutrifriend_user_id', profile.id.toString());
 
-      // Fetch logs
       try {
         const foodRes = await fetch(`http://localhost:8000/users/${profile.id}/foods`);
         if (foodRes.ok) {
@@ -112,6 +114,7 @@ const App: React.FC = () => {
         console.error("Error fetching logs", e);
       }
     }
+
     setCurrentTab('dashboard');
   };
 
@@ -122,7 +125,7 @@ const App: React.FC = () => {
     setAuthMode('login');
   };
 
-  const handleOnboardingComplete = (profile: UserProfile) => {
+  const handleOnboardingComplete = () => {
     alert("ลงทะเบียนสำเร็จ! กรุณาเข้าสู่ระบบ");
     setAuthMode('login');
   };
@@ -133,9 +136,7 @@ const App: React.FC = () => {
     try {
       const response = await fetch(`http://localhost:8000/users/${userProfile.id}/foods`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(log),
       });
 
@@ -145,7 +146,6 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error("Failed to add log", error);
-      // Optimistic update fallback
       setFoodLogs(prev => [log, ...prev]);
     }
   };
@@ -170,7 +170,6 @@ const App: React.FC = () => {
   };
 
   // --- Computed Stats ---
-  // Filter logs based on SELECTED DATE
   const currentLogs = foodLogs.filter(log => log.date === selectedDate);
 
   const dailyStats: DailyStats = currentLogs.reduce((acc, curr) => ({
@@ -188,13 +187,12 @@ const App: React.FC = () => {
   if (!userProfile) {
     if (authMode === 'login') {
       return <Login onLogin={handleLogin} onRegisterClick={() => setAuthMode('register')} />;
-    } else {
-      return <Onboarding onComplete={handleOnboardingComplete} onLoginClick={() => setAuthMode('login')} />;
     }
+    return <Onboarding onComplete={handleOnboardingComplete} onLoginClick={() => setAuthMode('login')} />;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-['Prompt']">
+    <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden font-['Prompt']">
 
       {/* Sidebar / Mobile Nav */}
       <nav className="md:w-64 bg-white shadow-lg z-10 flex flex-col fixed md:relative bottom-0 w-full md:h-screen h-16 md:border-r border-t md:border-t-0 border-gray-100">
@@ -247,7 +245,6 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto mb-16 md:mb-0 max-w-7xl mx-auto w-full">
-
         {/* Date Navigator Header */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div>
@@ -289,7 +286,11 @@ const App: React.FC = () => {
           />
         ) : (
           <div className="h-full flex flex-col">
-            <ChatAssistant userProfile={userProfile} foodLogs={currentLogs} />
+            <ChatAssistant
+              userProfile={userProfile}
+              foodLogs={currentLogs}
+              selectedDate={selectedDate}  // ✅ สำคัญ: ส่งวันที่เข้าแชท
+            />
           </div>
         )}
       </main>
