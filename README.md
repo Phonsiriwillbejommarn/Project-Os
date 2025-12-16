@@ -67,5 +67,4 @@ npm run dev
 ### 4. ใช้งาน
 เปิด Browser ไปที่ `http://localhost:5173`
 
----
-**พัฒนาโดย:** Phonsiri & Team
+
