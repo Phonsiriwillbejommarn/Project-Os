@@ -152,9 +152,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to SmartFood Analyzer API"}
+
 
 @app.get("/health")
 async def health_check():
@@ -618,6 +616,11 @@ FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fronte
 
 if os.path.exists(FRONTEND_DIST):
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+    # Serve root index.html
+    @app.get("/")
+    async def serve_root():
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
     # Catch-all route for SPA (React Router)
     @app.get("/{full_path:path}")
