@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, Gender, ActivityLevel, Goal } from '../types';
-import { User, Activity, Target, AlertCircle, Loader2 } from 'lucide-react';
+import { User, Activity, Target, AlertCircle, Loader2, ArrowRight, ArrowLeft, Check, Heart, Scale, Calendar } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: (profile: UserProfile) => void;
@@ -8,11 +8,14 @@ interface OnboardingProps {
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => {
+  const [step, setStep] = useState(1);
+  const totalSteps = 4;
+
   const [formData, setFormData] = useState<UserProfile>({
     username: '',
     password: '',
     name: '',
-    age: '' as any, // Initialize as empty string for UI, will be parsed as number
+    age: '' as any,
     gender: Gender.Male,
     weight: '' as any,
     height: '' as any,
@@ -24,261 +27,404 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  // Helper to check if current step is valid
+  const isStepValid = () => {
+    switch (step) {
+      case 1:
+        return formData.username.trim() !== '' && formData.password.length >= 4 && formData.name.trim() !== '';
+      case 2:
+        return formData.age > 0 && formData.weight > 0 && formData.height > 0;
+      case 3:
+        return true; // Selects always have value
+      case 4:
+        return true; // Optional fields
+      default:
+        return false;
+    }
+  };
+
+  const nextStep = () => {
+    if (isStepValid()) {
+      setStep(prev => Math.min(prev + 1, totalSteps));
+    }
+  };
+
+  const prevStep = () => {
+    setStep(prev => Math.max(prev - 1, 1));
+  };
+
   const handleChange = (field: keyof UserProfile, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.username && formData.password && formData.name && formData.weight > 0 && formData.height > 0) {
-      setIsLoading(true);
-      try {
-        // Map frontend camelCase to backend snake_case expected by API
-        const apiData = {
-          username: formData.username,
-          password: formData.password,
-          name: formData.name,
-          age: formData.age,
-          gender: formData.gender,
-          weight: formData.weight,
-          height: formData.height,
-          activity_level: formData.activityLevel, // Note snake_case
-          goal: formData.goal,
-          conditions: formData.conditions,
-          dietary_restrictions: formData.dietaryRestrictions, // Note snake_case
-          target_timeline: formData.targetTimeline
-        };
+  const calculateBMI = () => {
+    if (formData.weight > 0 && formData.height > 0) {
+      const h = formData.height / 100;
+      return (formData.weight / (h * h)).toFixed(1);
+    }
+    return null;
+  };
 
-        const response = await fetch('http://localhost:8000/users', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(apiData),
-        });
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    try {
+      const apiData = {
+        username: formData.username,
+        password: formData.password,
+        name: formData.name,
+        age: formData.age,
+        gender: formData.gender,
+        weight: formData.weight,
+        height: formData.height,
+        activity_level: formData.activityLevel,
+        goal: formData.goal,
+        conditions: formData.conditions,
+        dietary_restrictions: formData.dietaryRestrictions,
+        target_timeline: formData.targetTimeline
+      };
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'การลงทะเบียนล้มเหลว');
-        }
+      const response = await fetch('http://localhost:8000/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiData),
+      });
 
-        const newUser = await response.json();
-        // Convert back to frontend format if needed, but for now just pass formData + id
-        onComplete({ ...formData, id: newUser.id });
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการลงทะเบียน');
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'การลงทะเบียนล้มเหลว');
       }
-    } else {
-      alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+
+      const newUser = await response.json();
+      onComplete({ ...formData, id: newUser.id });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการลงทะเบียน');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-        <div className="bg-emerald-600 p-6 text-white text-center">
-          <h1 className="text-3xl font-bold mb-2">ยินดีต้อนรับสู่ NutriFriend AI</h1>
-          <p className="text-emerald-100">เราจะช่วยดูแลสุขภาพของคุณให้ดีที่สุด กรุณาให้ข้อมูลเบื้องต้น</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4 font-sans">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px]">
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6" autoComplete="off">
+        {/* Sidebar Summary (Desktop) */}
+        <div className="hidden md:flex flex-col bg-emerald-600 text-white w-1/3 p-8 justify-between relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full opacity-10">
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <path fill="#FFFFFF" d="M42.7,-62.9C50.9,-52.8,50.1,-34.4,51.7,-19.2C53.4,-4,57.4,8,54,18.7C50.6,29.4,39.8,38.8,28,46.6C16.2,54.4,3.4,60.6,-10.1,61.8C-23.6,63,-37.8,59.3,-48.6,50.5C-59.4,41.7,-66.8,27.9,-68.8,13.4C-70.8,-1.1,-67.4,-16.3,-58.5,-28.9C-49.6,-41.5,-35.1,-51.5,-21.3,-58.5C-7.5,-65.5,5.6,-69.5,17.9,-68.4L30.2,-67.3Z" transform="translate(100 100)" />
+            </svg>
+          </div>
 
-          {/* Personal Info */}
-          <div className="space-y-4">
-            <h2 className="flex items-center text-xl font-semibold text-gray-700 border-b pb-2">
-              <User className="w-5 h-5 mr-2 text-emerald-500" /> ข้อมูลบัญชีและส่วนตัว
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50 p-4 rounded-lg">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อผู้ใช้ (Username)</label>
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => handleChange('username', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="สำหรับเข้าสู่ระบบ"
-                    required
-                    autoComplete="off"
-                  />
+          <div className="relative z-10">
+            <h1 className="text-3xl font-bold mb-4 flex items-center gap-2">
+              <Heart className="fill-emerald-400 text-emerald-100" /> NutriFriend
+            </h1>
+            <p className="text-emerald-100 mb-8 opacity-90 leading-relaxed">
+              ดูแลสุขภาพผ่าน AI ผู้ช่วยส่วนตัวของคุณ เริ่มต้นง่ายๆ เพียงไม่กี่ขั้นตอน
+            </p>
+
+            <div className="space-y-4">
+              {[
+                { id: 1, label: 'สร้างบัญชี', icon: User },
+                { id: 2, label: 'ข้อมูลส่วนตัว', icon: Scale },
+                { id: 3, label: 'เป้าหมาย', icon: Target },
+                { id: 4, label: 'สุขภาพ', icon: Activity },
+              ].map((s) => (
+                <div key={s.id} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${step === s.id ? 'bg-white/20 translate-x-2' : 'opacity-60'}`}>
+                  <div className={`p-2 rounded-full ${step === s.id ? 'bg-white text-emerald-600' : 'bg-emerald-800 text-emerald-200'}`}>
+                    {step > s.id ? <Check size={16} /> : <s.icon size={16} />}
+                  </div>
+                  <span className="font-medium">{s.label}</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน (Password)</label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => handleChange('password', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="รหัสผ่านของคุณ"
-                    required
-                    autoComplete="new-password"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อเล่น</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="เช่น มิ้นท์"
-                  required
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">อายุ (ปี)</label>
-                <input
-                  type="number"
-                  value={formData.age}
-                  onChange={(e) => handleChange('age', e.target.value === '' ? '' : parseInt(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="ระบุอายุ"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">น้ำหนัก (กก.)</label>
-                <input
-                  type="number"
-                  value={formData.weight}
-                  onChange={(e) => handleChange('weight', e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="ระบุน้ำหนัก"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ส่วนสูง (ซม.)</label>
-                <input
-                  type="number"
-                  value={formData.height}
-                  onChange={(e) => handleChange('height', e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="ระบุส่วนสูง"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">เพศ</label>
-                <select
-                  value={formData.gender}
-                  onChange={(e) => handleChange('gender', e.target.value as Gender)}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                >
-                  <option value={Gender.Male}>ชาย</option>
-                  <option value={Gender.Female}>หญิง</option>
-                </select>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Activity & Goal */}
-          <div className="space-y-4">
-            <h2 className="flex items-center text-xl font-semibold text-gray-700 border-b pb-2">
-              <Activity className="w-5 h-5 mr-2 text-emerald-500" /> กิจกรรมและเป้าหมาย
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ระดับกิจกรรม</label>
-                <select
-                  value={formData.activityLevel}
-                  onChange={(e) => handleChange('activityLevel', e.target.value as ActivityLevel)}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                >
-                  <option value={ActivityLevel.Sedentary}>ไม่ออกกำลังกาย (นั่งทำงาน)</option>
-                  <option value={ActivityLevel.LightlyActive}>ออกกำลังกายเล็กน้อย (1-3 วัน/สัปดาห์)</option>
-                  <option value={ActivityLevel.ModeratelyActive}>ปานกลาง (3-5 วัน/สัปดาห์)</option>
-                  <option value={ActivityLevel.VeryActive}>หนัก (6-7 วัน/สัปดาห์)</option>
-                  <option value={ActivityLevel.ExtraActive}>หนักมาก (นักกีฬา/งานใช้แรง)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">เป้าหมาย</label>
-                <select
-                  value={formData.goal}
-                  onChange={(e) => handleChange('goal', e.target.value as Goal)}
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                >
-                  <option value={Goal.LoseWeight}>ลดน้ำหนัก</option>
-                  <option value={Goal.MaintainWeight}>รักษาน้ำหนัก</option>
-                  <option value={Goal.GainMuscle}>เพิ่มกล้ามเนื้อ</option>
-                </select>
-              </div>
+          <div className="relative z-10 text-xs text-emerald-200 text-center">
+            © 2024 NutriFriend AI
+          </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 p-6 md:p-10 flex flex-col relative bg-slate-50">
+          {/* Mobile Progress Bar */}
+          <div className="md:hidden mb-6">
+            <div className="flex justify-between mb-2 text-xs font-medium text-gray-500">
+              <span>ต้อนรับ</span>
+              <span>{Math.round((step / totalSteps) * 100)}%</span>
             </div>
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">ระยะเวลาเป้าหมาย</label>
-              <select
-                value={formData.targetTimeline}
-                onChange={(e) => handleChange('targetTimeline', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(step / totalSteps) * 100}%` }}></div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+
+            {step === 1 && (
+              <div className="animate-in fade-in slide-in-from-right duration-300">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">เริ่มสร้างบัญชีของคุณ</h2>
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
+                    <input
+                      type="text"
+                      value={formData.username}
+                      onChange={(e) => handleChange('username', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm"
+                      placeholder="ชื่อผู้ใช้สำหรับเข้าสู่ระบบ"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                    <input
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => handleChange('password', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm"
+                      placeholder="รหัสผ่านอย่างน้อย 4 ตัวอักษร"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อเล่น</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm"
+                      placeholder="เช่น มิ้นท์, บอล"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="animate-in fade-in slide-in-from-right duration-300">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">ข้อมูลร่างกาย</h2>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">เพศ</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      {[Gender.Male, Gender.Female].map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => handleChange('gender', g)}
+                          className={`py-4 rounded-xl border-2 font-medium transition-all ${formData.gender === g
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md transform scale-[1.02]'
+                              : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
+                            }`}
+                        >
+                          {g === Gender.Male ? 'ชาย' : 'หญิง'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">น้ำหนัก (kg)</label>
+                      <input
+                        type="number"
+                        value={formData.weight}
+                        onChange={(e) => handleChange('weight', parseFloat(e.target.value))}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-center text-lg font-medium"
+                        placeholder="0.0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">ส่วนสูง (cm)</label>
+                      <input
+                        type="number"
+                        value={formData.height}
+                        onChange={(e) => handleChange('height', parseFloat(e.target.value))}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-center text-lg font-medium"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">อายุ (ปี)</label>
+                    <input
+                      type="number"
+                      value={formData.age}
+                      onChange={(e) => handleChange('age', parseInt(e.target.value))}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-lg"
+                      placeholder="ระบุอายุ"
+                    />
+                  </div>
+
+                  {calculateBMI() && (
+                    <div className="bg-blue-50 text-blue-800 px-4 py-3 rounded-xl flex justify-between items-center text-sm">
+                      <span className="font-medium">ดัชนีมวลกาย (BMI) เบื้องต้น:</span>
+                      <span className="text-xl font-bold">{calculateBMI()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="animate-in fade-in slide-in-from-right duration-300">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">ไลฟ์สไตล์และเป้าหมาย</h2>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">ระดับกิจกรรมประจำวัน</label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                      {[
+                        { val: ActivityLevel.Sedentary, label: 'นั่งทำงาน (Sedentary)', desc: 'ไม่ออกกำลังกายเลย หรือน้อยมาก' },
+                        { val: ActivityLevel.LightlyActive, label: 'เล็กน้อย (Lightly Active)', desc: 'ออกกำลังกาย 1-3 วัน/สัปดาห์' },
+                        { val: ActivityLevel.ModeratelyActive, label: 'ปานกลาง (Moderately Active)', desc: 'ออกกำลังกาย 3-5 วัน/สัปดาห์' },
+                        { val: ActivityLevel.VeryActive, label: 'หนัก (Very Active)', desc: 'ออกกำลังกาย 6-7 วัน/สัปดาห์' },
+                        { val: ActivityLevel.ExtraActive, label: 'หนักมาก (Extra Active)', desc: 'งานใช้แรง หรือนักกีฬาอาชีพ' },
+                      ].map((opt) => (
+                        <div
+                          key={opt.val}
+                          onClick={() => handleChange('activityLevel', opt.val)}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-3 ${formData.activityLevel === opt.val
+                              ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                              : 'border-gray-200 hover:bg-gray-50 bg-white'
+                            }`}
+                        >
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${formData.activityLevel === opt.val ? 'border-emerald-500' : 'border-gray-300'}`}>
+                            {formData.activityLevel === opt.val && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-800 text-sm">{opt.label}</div>
+                            <div className="text-xs text-gray-500">{opt.desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">เป้าหมายหลัก</label>
+                      <select
+                        value={formData.goal}
+                        onChange={(e) => handleChange('goal', e.target.value as Goal)}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      >
+                        <option value={Goal.LoseWeight}>ลดน้ำหนัก</option>
+                        <option value={Goal.MaintainWeight}>รักษาน้ำหนัก</option>
+                        <option value={Goal.GainMuscle}>เพิ่มกล้ามเนื้อ</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">ระยะเวลา</label>
+                      <select
+                        value={formData.targetTimeline}
+                        onChange={(e) => handleChange('targetTimeline', e.target.value)}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      >
+                        <option value="1 Month">1 เดือน</option>
+                        <option value="3 Months">3 เดือน</option>
+                        <option value="6 Months">6 เดือน</option>
+                        <option value="1 Year">1 ปี</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="animate-in fade-in slide-in-from-right duration-300">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">ข้อมูลสุขภาพเพิ่มเติม</h2>
+                <div className="space-y-5">
+                  <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex gap-3 text-orange-800 text-sm mb-4">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 text-orange-500" />
+                    <p>ข้อมูลนี้สำคัญมาก เพื่อให้ AI ประเมินและแนะนำโภชนาการได้อย่างปลอดภัย โปรดระบุตามความเป็นจริง</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">โรคประจำตัว</label>
+                    <textarea
+                      value={formData.conditions}
+                      onChange={(e) => handleChange('conditions', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm h-24 resize-none"
+                      placeholder="เช่น เบาหวาน, ความดันโลหิตสูง, ไตเรื้อรัง (หากไม่มีให้เว้นว่าง)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">ข้อจำกัดอาหาร / การแพ้</label>
+                    <textarea
+                      value={formData.dietaryRestrictions}
+                      onChange={(e) => handleChange('dietaryRestrictions', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm h-24 resize-none"
+                      placeholder="เช่น แพ้ถั่วลิสง, แพ้นมวัว, ทานเจ, อิสลาม (หากไม่มีให้เว้นว่าง)"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* Actions */}
+          <div className="pt-6 mt-2 border-t border-gray-100 flex justify-between items-center">
+            {step > 1 ? (
+              <button
+                onClick={prevStep}
+                className="text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center"
               >
-                <option value="1 Month">1 เดือน</option>
-                <option value="3 Months">3 เดือน</option>
-                <option value="6 Months">6 เดือน</option>
-                <option value="1 Year">1 ปี</option>
-              </select>
-            </div>
+                <ArrowLeft size={18} className="mr-2" /> ย้อนกลับ
+              </button>
+            ) : (
+              <button
+                onClick={onLoginClick}
+                className="text-emerald-600 font-medium px-4 py-2 hover:bg-emerald-50 rounded-lg transition-colors"
+              >
+                เข้าสู่ระบบ
+              </button>
+            )}
+
+            {step < totalSteps ? (
+              <button
+                onClick={nextStep}
+                disabled={!isStepValid()}
+                className={`bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-emerald-200 flex items-center transition-all ${!isStepValid() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-700 hover:scale-105 filter'}`}
+              >
+                ถัดไป <ArrowRight size={18} className="ml-2" />
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 flex items-center transition-all hover:bg-emerald-700 hover:shadow-xl hover:scale-105"
+              >
+                {isLoading ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2" />}
+                วิเคราะห์และเริ่มต้น
+              </button>
+            )}
           </div>
-
-          {/* Health Conditions */}
-          <div className="space-y-4">
-            <h2 className="flex items-center text-xl font-semibold text-gray-700 border-b pb-2">
-              <AlertCircle className="w-5 h-5 mr-2 text-emerald-500" /> ข้อมูลสุขภาพ
-            </h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">โรคประจำตัว (ถ้ามี)</label>
-              <input
-                type="text"
-                value={formData.conditions}
-                onChange={(e) => handleChange('conditions', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                placeholder="เช่น เบาหวาน, ความดันโลหิตสูง (สำคัญมากสำหรับการประมวลผลของ AI)"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-[1.02] flex items-center justify-center text-lg"
-          >
-            <Target className="w-6 h-6 mr-2" /> เริ่มต้นใช้งาน
-          </button>
-
-        </form>
-
-        <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
-          <p className="text-sm text-gray-600">
-            มีบัญชีอยู่แล้ว?{' '}
-            <button
-              onClick={onLoginClick}
-              className="text-emerald-600 font-semibold hover:underline"
-            >
-              เข้าสู่ระบบ
-            </button>
-          </p>
         </div>
-      </div >
+      </div>
 
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm text-center animate-in fade-in zoom-in duration-300">
-            <div className="relative mb-6">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm text-center relative overflow-hidden">
+
+            <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-green-500"></div>
+
+            <div className="relative mb-8">
               <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-75"></div>
-              <div className="relative bg-emerald-50 p-4 rounded-full">
-                <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+              <div className="relative bg-emerald-50 p-5 rounded-full ring-4 ring-emerald-50">
+                <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
               </div>
             </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">กำลังวิเคราะห์ข้อมูล...</h3>
-            <p className="text-gray-500 text-sm">
-              AI Nutritionist กำลังประเมินสุขภาพและสร้างแผนโภชนาการที่เหมาะสมที่สุดสำหรับคุณ
+            <h3 className="text-2xl font-bold text-gray-800 mb-3">กำลังประมวลผล...</h3>
+            <p className="text-gray-500 leading-relaxed">
+              AI Nutritionist กำลังวิเคราะห์ข้อมูลสุขภาพของคุณเพื่อสร้างแผนโภชนาการส่วนบุคคล
             </p>
           </div>
         </div>
       )}
-    </div >
+    </div>
   );
 };
 

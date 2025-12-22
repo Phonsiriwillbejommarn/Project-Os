@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 import uuid
 import os
@@ -21,7 +22,7 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ServerError
 
-from models import init_db, get_db, UserProfile, FoodItem, Message
+from models import init_db, get_db, UserProfile, FoodItem, Message, MessageRole
 from schemas import (
     UserProfileCreate, UserProfileResponse, UserProfileUpdate,
     FoodItemCreate, FoodItemResponse,
@@ -104,28 +105,71 @@ def inflight_release(key: str):
 # ============================================================
 # Gemini helper: retry/backoff + map 503 properly
 # ============================================================
-def gemini_generate_with_backoff(model: str, contents, max_tries: int = 4) -> str:
-    delay = 1.0
-    for attempt in range(1, max_tries + 1):
-        try:
-            resp = client.models.generate_content(model=model, contents=contents)
-            return (resp.text or "").strip()
+# Fallback chain as requested
+FALLBACK_CHAIN = [
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemma-3-27b-it"
+]
 
-        except ServerError as e:
-            msg = str(e)
-            # 503 overloaded
-            if "503" in msg:
-                if attempt < max_tries:
-                    time.sleep(delay)
-                    delay = min(delay * 2, 8.0)
-                    continue
-                raise HTTPException(status_code=503, detail="AI model overloaded. Please try again later.")
+def gemini_generate_with_backoff(model: str, contents, config: Optional[types.GenerateContentConfig] = None, max_tries: int = 2) -> str:
+    # Build list of models to try: requested model first, then the rest of the chain
+    models_to_try = [model]
+    for m in FALLBACK_CHAIN:
+        if m != model and m not in models_to_try:
+            models_to_try.append(m)
 
-            # other server-side errors
-            raise HTTPException(status_code=502, detail=f"Upstream error: {msg}")
+    last_error = None
 
-        except Exception:
-            raise HTTPException(status_code=500, detail="AI request failed.")
+    for model_name in models_to_try:
+        print(f"[DEBUG] Attempting AI generation with model: {model_name}")
+        delay = 1.0
+        
+        # Try up to max_tries for EACH model (mainly for 503s)
+        for attempt in range(1, max_tries + 1):
+            try:
+                # Note: config (search grounding) might not be supported by all models (e.g. Gemma).
+                # If it's Gemma and we have config, we might want to drop it?
+                # For now, we try as is. If it fails invalid arg, we catch relevant error below.
+                resp = client.models.generate_content(model=model_name, contents=contents, config=config)
+
+                # Check if search was used
+                if resp.candidates and resp.candidates[0].grounding_metadata and resp.candidates[0].grounding_metadata.search_entry_point:
+                    print(f"[DEBUG] 🔍 Google Search used by model: {model_name}")
+                
+                return (resp.text or "").strip()
+
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                print(f"[WARN] Model {model_name} (Attempt {attempt}/{max_tries}) failed: {error_str}")
+
+                # Check for fatal errors that suggest "Move to next model immediately"
+                # 429 = Quota exceeded / Too many requests
+                # 404 = Model not found
+                # 400 = Bad Request (Invalid Argument) -> e.g. model doesn't support search tools
+                is_fatal = any(x in error_str for x in ["429", "404", "400", "Resource has been exhausted", "Not Found", "Invalid Argument"])
+                
+                if is_fatal:
+                    # If this model is broken/full/incompatible, don't retry IT. Move to NEXT model in chain.
+                    break 
+
+                # If it's a 503 (Overloaded) -> Wait and retry THIS model
+                if "503" in error_str:
+                    if attempt < max_tries:
+                        time.sleep(delay)
+                        delay = min(delay * 2, 5.0)
+                        continue
+                
+                # For safety, if we hit other unknown errors, we also break to try the next model
+                break
+
+    # If we exit the loop, all models failed
+    import traceback
+    traceback.print_exc()
+    print(f"!!! ALL FALLBACK MODELS FAILED. Last error: {last_error}")
+    raise HTTPException(status_code=500, detail=f"AI Service Temporarily Unavailable. All models failed. Last error: {last_error}")
 
 
 # ============================================================
@@ -175,6 +219,14 @@ if GEMINI_API_KEY:
         print(f"[DEBUG] Failed to initialize Gemini client: {e}")
 
 
+# ============================================================
+# Search Tool Config
+# ============================================================
+SEARCH_CONFIG = types.GenerateContentConfig(
+    tools=[types.Tool(google_search=types.GoogleSearch())],
+    response_mime_type="text/plain" 
+)
+
 # ==================== User Profile Endpoints ====================
 
 @app.post("/users", response_model=UserProfileResponse)
@@ -193,7 +245,11 @@ def create_user(user: UserProfileCreate, db: Session = Depends(get_db), req: Req
     if client:
         try:
             prompt = f"""
-วิเคราะห์ข้อมูลผู้ใช้และสร้างแผนโภชนาการเบื้องต้น:
+บทบาท: คุณคือ "NutriFriend" เพื่อนซี้ที่มีความรู้ลึกรู้จริงด้านโภชนาการและสุขภาพ
+บุคลิก: เป็นกันเอง, เข้าถึงง่าย, จริงใจ, หวังดี, และคอยให้กำลังใจ (Supportive)
+สไตล์การเขียน: เล่าเรื่องเหมือนเพื่อนคุยกับเพื่อน ใช้ภาษาพูดที่เป็นธรรมชาติ (Spoken Language) ไม่ใช้คำศัพท์ทางการหรือวิชาการที่เข้าใจยาก
+
+ข้อมูลเพื่อนของคุณ:
 ชื่อ: {user.name}
 อายุ: {user.age}
 เพศ: {user.gender}
@@ -205,17 +261,15 @@ def create_user(user: UserProfileCreate, db: Session = Depends(get_db), req: Req
 โรคประจำตัว: {user.conditions}
 ข้อจำกัดอาหาร: {user.dietary_restrictions}
 
-คำสั่ง:
-1. ให้ใช้เกณฑ์ปริมาณสารอาหารที่แนะนำสำหรับคนไทย (Thai RDI) จากกรมอนามัย กระทรวงสาธารณสุข
-2. อ้างอิงฐานข้อมูลสารอาหารไทยจากสถาบันโภชนาการ มหาวิทยาลัยมหิดล (INMUCAL)
-3. สำหรับผู้ที่มีโรคประจำตัว ให้อ้างอิงแนวทางเวชปฏิบัติจากคณะแพทยศาสตร์ศิริราชพยาบาล หรือโรงพยาบาลรามาธิบดี
+ภารกิจของคุณ:
+ช่วยวิเคราะห์และวางแผนการกินให้เพื่อนหน่อย โดยอ้างอิงหลักการแพทย์ที่น่าเชื่อถือ (เช่น กรมอนามัย, INMUCAL, รพ.ศิริราช/รามา) แต่ให้เรียบเรียงใหม่เป็นคำพูดของคุณเองที่ชวนอ่าน
 
-กรุณาให้คำแนะนำและคำนวณเป้าหมายโภชนาการ:
-1. การประเมินสุขภาพเบื้องต้น (BMI, BMR, TDEE)
-2. คำแนะนำแคลอรี่และสารอาหารที่ควรได้รับต่อวัน
-3. แนวทางการทานอาหารเพื่อให้บรรลุเป้าหมายในระยะเวลาที่กำหนด
-4. ข้อควรระวัง
-5. สร้าง "เคล็ดลับสุขภาพประจำวัน" จำนวน 7 ข้อ (สำหรับ 7 วัน)
+หัวข้อที่ต้องตอบ:
+1. เช็คสุขภาพกันหน่อย (ประเมิน BMI, BMR แบบเข้าใจง่ายๆ ว่าตอนนี้หุ่นเป็นไง)
+2. ควรกินยังไงดี? (แนะนำแคลอรี่และสารอาหารแบบไม่ต้องเครียดมาก)
+3. How-to พิชิตเป้าหมาย (ขอคำแนะนำที่ทำได้จริง ไม่ขายฝัน)
+4. เรื่องที่ต้องระวัง (เตือนด้วยความเป็นห่วง)
+5. 7 วัน 7 เคล็ดลับ (ทริคเล็กๆ น้อยๆ ในการดูแลตัวเอง)
 
 ตอบเป็น JSON เท่านั้น ในรูปแบบ:
 {{
@@ -248,7 +302,12 @@ def create_user(user: UserProfileCreate, db: Session = Depends(get_db), req: Req
                 # inflight กัน request ซ้อน
                 inflight_acquire(key)
                 try:
-                    result_text = gemini_generate_with_backoff("gemini-2.5-flash", [prompt])
+                    # Enable search for profile assessment to find medical info
+                    result_text = gemini_generate_with_backoff(
+                        "gemini-3-flash-preview", 
+                        [prompt],
+                        config=SEARCH_CONFIG
+                    )
                     cache_set(key, result_text, ttl=60)
                 finally:
                     inflight_release(key)
@@ -293,10 +352,14 @@ def create_user(user: UserProfileCreate, db: Session = Depends(get_db), req: Req
         target_fat=target_fat,
         daily_tips=daily_tips
     )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    try:
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Username already exists")
 
 
 @app.post("/login", response_model=UserProfileResponse)
@@ -515,7 +578,7 @@ async def analyze_food(request: AnalyzeFoodRequest, req: Request):
             inflight_acquire(key)
             try:
                 result_text = gemini_generate_with_backoff(
-                    "gemini-2.5-flash",
+                    "gemini-3-flash-preview",
                     [types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), prompt]
                 )
                 cache_set(key, result_text, ttl=120)
@@ -542,7 +605,7 @@ async def analyze_food(request: AnalyzeFoodRequest, req: Request):
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_with_ai(request: ChatRequest, req: Request):
+async def chat_with_ai(request: ChatRequest, req: Request, db: Session = Depends(get_db)):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
 
@@ -552,26 +615,45 @@ async def chat_with_ai(request: ChatRequest, req: Request):
     profile = request.profile
     food_logs = request.foodLogs
 
-    context = f"""คุณเป็นผู้เชี่ยวชาญด้านโภชนาการชื่อ NutriFriend AI
+    # --- Fetch Chat History ---
+    user_id = profile.get('id')
+    history_text = ""
+    if user_id:
+        # Get last 15 messages (excluding current one if it was already saved - though usually frontend calls chat api separately)
+        # We want context of previous conversation.
+        previous_msgs = db.query(Message).filter(Message.user_id == user_id).order_by(Message.timestamp.desc()).limit(15).all()
+        previous_msgs.reverse() # Sort chronological: Old -> New
 
-ข้อมูลผู้ใช้:
+        if previous_msgs:
+            history_text = "\n\n=== ประวัติการสนทนาล่าสุด (Context) ===\n"
+            for msg in previous_msgs:
+                role_label = "เพื่อน (User)" if msg.role == MessageRole.user else "NutriFriend (AI)"
+                history_text += f"{role_label}: {msg.text}\n"
+            history_text += "========================================\n"
+
+    context = f"""บทบาท: คุณคือ "NutriFriend" เพื่อนซี้โภชนาการของคุณ {profile.get('name', 'เพื่อน')}
+บุคลิก: คุยสนุก เป็นกันเอง เหมือนเพื่อนสนิทที่หวังดี (แต่มีความรู้แน่นปึ้ก!)
+สไตล์การตอบ: 
+- ใช้ภาษาพูดที่เป็นธรรมชาติ (เช่น "นะครับ/คะ", "ลองแบบนี้ดูมั้ย", "ดีเลยครับ")
+- หลีกเลี่ยงคำทางการน่าเบื่อ (เช่น "จากข้อมูลข้างต้น", "จึงเรียนมาเพื่อทราบ")
+- ถ้าข้อมูลวิชาการยากๆ ให้เปรียบเทียบหรือเล่าให้เห็นภาพง่ายๆ
+- ให้กำลังใจและชื่นชมเสมอเมื่อเพื่อนทำดี
+
+ข้อมูลโปรไฟล์เพื่อน:
 - ชื่อ: {profile.get('name', 'ไม่ระบุ')}
 - อายุ: {profile.get('age', 'ไม่ระบุ')} ปี
-- เพศ: {profile.get('gender', 'ไม่ระบุ')}
-- น้ำหนัก: {profile.get('weight', 'ไม่ระบุ')} kg
-- ส่วนสูง: {profile.get('height', 'ไม่ระบุ')} cm
-- ระดับกิจกรรม: {profile.get('activityLevel', 'ไม่ระบุ')}
+- สัดส่วน: หนัก {profile.get('weight', 'ไม่ระบุ')} kg / สูง {profile.get('height', 'ไม่ระบุ')} cm
+- กิจกรรม: {profile.get('activityLevel', 'ไม่ระบุ')}
 - เป้าหมาย: {profile.get('goal', 'ไม่ระบุ')}
-- โรคประจำตัว: {profile.get('conditions', 'ไม่มี')}
-- ข้อจำกัดด้านอาหาร: {profile.get('dietaryRestrictions', 'ไม่มี')}
+- เงื่อนไขร่างกาย: {profile.get('conditions', 'แข็งแรงดี')} / {profile.get('dietaryRestrictions', 'ทานได้ทุกอย่าง')}
 
-อาหารที่ทานวันนี้: {len(food_logs)} รายการ
-แคลอรี่รวม: {sum(f.get('calories', 0) for f in food_logs)} kcal
+อาหารวันนี้: {len(food_logs)} เมนู (แคลรวม: {sum(f.get('calories', 0) for f in food_logs)} kcal)
+{history_text}
+คำแนะนำเพิ่มเติม:
+- ถ้าเพื่อนถามเรื่องป่วย ให้แนะนำให้ปรึกษาหมอด้วยความเป็นห่วงเสมอ
+- "Google Search" จะช่วยหาข้อมูลล่าสุดให้คุณ อย่าลืมใช้ข้อมูลนั้นมาเล่าต่อเพื่อนนะ"""
 
-กรุณาตอบคำถามหรือให้คำแนะนำด้านโภชนาการอย่างเป็นกันเองและเป็นประโยชน์
-โดยอ้างอิงหลักการแพทย์จากคณะแพทยศาสตร์ศิริราชพยาบาล, โรงพยาบาลรามาธิบดี และกรมอนามัย"""
-
-    contents = [context, f"\nคำถาม: {request.message}"]
+    contents = [context, f"\nเพื่อนถามว่า: {request.message}"]
 
     img_sig = ""
     if request.image:
@@ -600,7 +682,12 @@ async def chat_with_ai(request: ChatRequest, req: Request):
 
     inflight_acquire(key)
     try:
-        text = gemini_generate_with_backoff("gemini-2.5-flash", contents)
+        # Enable search for chat
+        text = gemini_generate_with_backoff(
+            "gemini-3-flash-preview", 
+            contents,
+            config=SEARCH_CONFIG
+        )
         cache_set(key, text)
         return ChatResponse(response=text)
     finally:
@@ -613,6 +700,10 @@ async def chat_with_ai(request: ChatRequest, req: Request):
 # Mount static files (JS, CSS, Images)
 # Check if dist folder exists (it should be in ../frontend/dist relative to backend)
 FRONTEND_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+if not os.path.exists(FRONTEND_DIST):
+    BACKEND_DIST = os.path.join(os.path.dirname(__file__), "dist")
+    if os.path.exists(BACKEND_DIST):
+        FRONTEND_DIST = BACKEND_DIST
 
 if os.path.exists(FRONTEND_DIST):
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
