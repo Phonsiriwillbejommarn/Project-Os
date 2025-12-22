@@ -192,7 +192,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden font-['Prompt']">
+    // ✅ เพิ่ม min-h-0 เพื่อให้ flex children คำนวณความสูง/scroll ได้ถูกต้อง
+    <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden min-h-0 font-['Prompt']">
 
       {/* Sidebar / Mobile Nav */}
       <nav className="md:w-64 bg-white shadow-lg z-10 flex flex-col fixed md:relative bottom-0 w-full md:h-screen h-16 md:border-r border-t md:border-t-0 border-gray-100">
@@ -244,7 +245,8 @@ const App: React.FC = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto mb-16 md:mb-0 max-w-7xl mx-auto w-full">
+      {/* ✅ เพิ่ม min-h-0 เพื่อให้ Dashboard ใช้ flex-1 / overflow ได้ถูกต้อง */}
+      <main className="flex-1 min-h-0 p-4 md:p-8 overflow-y-auto mb-16 md:mb-0 max-w-7xl mx-auto w-full">
         {/* Date Navigator Header */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div>
@@ -289,7 +291,7 @@ const App: React.FC = () => {
             <ChatAssistant
               userProfile={userProfile}
               foodLogs={currentLogs}
-              selectedDate={selectedDate}  // ✅ สำคัญ: ส่งวันที่เข้าแชท
+              selectedDate={selectedDate}
             />
           </div>
         )}
