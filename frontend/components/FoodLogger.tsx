@@ -74,7 +74,7 @@ const FoodLogger: React.FC<FoodLoggerProps> = ({ logs, onAddLog, onRemoveLog, se
   // Logs are already filtered by parent, but let's just render the list passed in `logs`
   
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[210px]">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-700 flex items-center">
           <Utensils className="w-5 h-5 mr-2 text-emerald-500" /> บันทึกรายการอาหาร ({new Date(selectedDate).toLocaleDateString('th-TH')})
