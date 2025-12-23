@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Message, UserProfile, FoodItem } from "../types";
 import { Send, Bot, User as UserIcon, Loader2, Image as ImageIcon, X, Trash2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface ChatAssistantProps {
   userProfile: UserProfile;
@@ -59,7 +60,11 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
 
   /* ---------------- Auto scroll ---------------- */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // ใช้ scrollTop แทน scrollIntoView เพื่อไม่ให้กระทบหน้าหลัก
+    if (messagesEndRef.current?.parentElement) {
+      const container = messagesEndRef.current.parentElement;
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages]);
 
   /* ---------------- Clear chat (this date only) ---------------- */
@@ -69,7 +74,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
 
     try {
       await fetch(`${API_BASE}/users/${userId}/messages?date=${selectedDate}`, { method: "DELETE" });
-    } catch {}
+    } catch { }
 
     setMessages([INITIAL_MESSAGE]);
   };
@@ -215,7 +220,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="flex flex-col h-[600px] bg-white rounded-2xl border shadow-sm overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-180px)] min-h-[400px] bg-white rounded-2xl border shadow-sm overflow-hidden">
       {/* Header */}
       <div className="bg-emerald-600 p-4 text-white flex justify-between items-center">
         <div className="flex items-center gap-2">
@@ -232,9 +237,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[80%] p-4 rounded-2xl text-sm shadow ${
-                msg.role === "user" ? "bg-emerald-600 text-white" : "bg-white border"
-              }`}
+              className={`max-w-[80%] p-4 rounded-2xl text-sm shadow ${msg.role === "user" ? "bg-emerald-600 text-white" : "bg-white border"
+                }`}
             >
               <div className="text-xs opacity-70 flex items-center gap-1 mb-1">
                 {msg.role === "user" ? <UserIcon size={12} /> : <Bot size={12} />}
@@ -243,7 +247,20 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
 
               {msg.image && <img src={msg.image} alt="uploaded" className="rounded-lg mb-2 max-h-60" />}
 
-              <div className="whitespace-pre-wrap">{msg.text}</div>
+              <div className={`prose prose-sm max-w-none ${msg.role === "user" ? "prose-invert text-white" : "text-gray-800"}`}>
+                <ReactMarkdown
+                  components={{
+                    // ปรับแต่ง style ของ element ต่างๆ ให้สวยงามขึ้น
+                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                    ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                    ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                    li: ({ node, ...props }) => <li className="" {...props} />,
+                    strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
+                  }}
+                >
+                  {msg.text}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         ))}
