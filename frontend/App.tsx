@@ -31,7 +31,7 @@ const App: React.FC = () => {
       const storedUserId = localStorage.getItem('nutrifriend_user_id');
       if (storedUserId) {
         try {
-          const userRes = await fetch(`http://localhost:8000/users/${storedUserId}`);
+          const userRes = await fetch(`/users/${storedUserId}`);
           if (userRes.ok) {
             const userData = await userRes.json();
 
@@ -58,7 +58,7 @@ const App: React.FC = () => {
 
             setUserProfile(profile);
 
-            const foodRes = await fetch(`http://localhost:8000/users/${storedUserId}/foods`);
+            const foodRes = await fetch(`/users/${storedUserId}/foods`);
             if (foodRes.ok) {
               const foodData = await foodRes.json();
               setFoodLogs(foodData);
@@ -105,7 +105,7 @@ const App: React.FC = () => {
       localStorage.setItem('nutrifriend_user_id', profile.id.toString());
 
       try {
-        const foodRes = await fetch(`http://localhost:8000/users/${profile.id}/foods`);
+        const foodRes = await fetch(`/users/${profile.id}/foods`);
         if (foodRes.ok) {
           const foodData = await foodRes.json();
           setFoodLogs(foodData);
@@ -134,7 +134,7 @@ const App: React.FC = () => {
     if (!userProfile?.id) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/users/${userProfile.id}/foods`, {
+      const response = await fetch(`/users/${userProfile.id}/foods`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(log),
@@ -154,7 +154,7 @@ const App: React.FC = () => {
     if (!userProfile?.id) return;
 
     try {
-      await fetch(`http://localhost:8000/users/${userProfile.id}/foods/${id}`, {
+      await fetch(`/users/${userProfile.id}/foods/${id}`, {
         method: 'DELETE',
       });
       setFoodLogs(prev => prev.filter(item => item.id !== id));

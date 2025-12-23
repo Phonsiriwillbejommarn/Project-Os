@@ -1,6 +1,6 @@
 import { UserProfile, FoodItem } from "../types";
 
-const API_URL = "http://localhost:8000";
+const API_URL = '';
 
 export const startChatSession = (profile: UserProfile) => {
   // No longer needed on frontend, handled by backend statelessly or via session
@@ -8,9 +8,9 @@ export const startChatSession = (profile: UserProfile) => {
 };
 
 export const sendMessageToGemini = async (
-  message: string, 
-  image: string | undefined, 
-  profile: UserProfile, 
+  message: string,
+  image: string | undefined,
+  profile: UserProfile,
   foodLogs: FoodItem[]
 ): Promise<string> => {
   try {
@@ -39,7 +39,7 @@ export const sendMessageToGemini = async (
   }
 };
 
-export const analyzeFoodFromImage = async (imageBase64: string): Promise<{name: string, calories: number, protein: number, carbs: number, fat: number} | null> => {
+export const analyzeFoodFromImage = async (imageBase64: string): Promise<{ name: string, calories: number, protein: number, carbs: number, fat: number } | null> => {
   try {
     const response = await fetch(`${API_URL}/analyze-food`, {
       method: 'POST',

@@ -9,7 +9,7 @@ interface ChatAssistantProps {
   selectedDate: string;
 }
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "";
 
 const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, selectedDate }) => {
   const userId = userProfile.id;

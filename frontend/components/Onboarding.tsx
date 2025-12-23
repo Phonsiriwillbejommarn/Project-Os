@@ -83,21 +83,43 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
         target_timeline: formData.targetTimeline
       };
 
-      const response = await fetch('http://localhost:8000/users', {
+      const response = await fetch('/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(apiData),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'การลงทะเบียนล้มเหลว');
+        const errorText = await response.text();
+        console.error("Server Error Response:", errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.detail || 'การลงทะเบียนล้มเหลว');
+        } catch (e) {
+          throw new Error(`Server Error (${response.status}): ${errorText.substring(0, 100)}`);
+        }
       }
 
-      const newUser = await response.json();
+      const responseText = await response.text();
+      console.log("Raw Server Response:", responseText);
+
+      let newUser;
+      try {
+        newUser = JSON.parse(responseText);
+      } catch (e) {
+        console.error("JSON Parse Error:", e);
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+      }
+
       onComplete({ ...formData, id: newUser.id });
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการลงทะเบียน');
+    } catch (error: any) {
+      console.error("Registration Error:", error);
+      // Show detailed error for debugging
+      const errorMsg = error?.message || 'Unknown error';
+      const errorStack = error?.stack || '';
+      const errorName = error?.name || 'Error';
+
+      alert(`Error: ${errorName}\nMessage: ${errorMsg}\n\n(Please verify backend connection)`);
     } finally {
       setIsLoading(false);
     }
@@ -211,8 +233,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                           type="button"
                           onClick={() => handleChange('gender', g)}
                           className={`py-4 rounded-xl border-2 font-medium transition-all ${formData.gender === g
-                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md transform scale-[1.02]'
-                              : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md transform scale-[1.02]'
+                            : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
                             }`}
                         >
                           {g === Gender.Male ? 'ชาย' : 'หญิง'}
@@ -283,8 +305,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                           key={opt.val}
                           onClick={() => handleChange('activityLevel', opt.val)}
                           className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-3 ${formData.activityLevel === opt.val
-                              ? 'border-emerald-500 bg-emerald-50 shadow-sm'
-                              : 'border-gray-200 hover:bg-gray-50 bg-white'
+                            ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+                            : 'border-gray-200 hover:bg-gray-50 bg-white'
                             }`}
                         >
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${formData.activityLevel === opt.val ? 'border-emerald-500' : 'border-gray-300'}`}>
