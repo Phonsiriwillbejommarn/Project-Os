@@ -129,10 +129,13 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
         # Try up to max_tries for EACH model (mainly for 503s)
         for attempt in range(1, max_tries + 1):
             try:
-                # Note: config (search grounding) might not be supported by all models (e.g. Gemma).
-                # If it's Gemma and we have config, we might want to drop it?
-                # For now, we try as is. If it fails invalid arg, we catch relevant error below.
-                resp = client.models.generate_content(model=model_name, contents=contents, config=config)
+                # Special handling for Gemma: Does NOT support Search Tool
+                current_config = config
+                if "gemma" in model_name.lower():
+                    # Remove search config for Gemma to avoid 400 INVALID_ARGUMENT
+                    current_config = None
+
+                resp = client.models.generate_content(model=model_name, contents=contents, config=current_config)
 
                 # Check if search was used
                 if resp.candidates and resp.candidates[0].grounding_metadata and resp.candidates[0].grounding_metadata.search_entry_point:
