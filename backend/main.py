@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+#AIzaSyCtjpIF9-GFkJboudELV6ycE6IWZ5ROBns
 
 from google import genai
 from google.genai import types
