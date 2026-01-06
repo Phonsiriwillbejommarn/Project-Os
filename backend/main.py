@@ -163,23 +163,32 @@ FALLBACK_CHAIN = [
     "gemma-3-27b-it"
 ]
 
-def gemini_generate_with_backoff(model: str, contents, config: Optional[types.GenerateContentConfig] = None, max_tries: int = 2) -> str:
+def gemini_generate_with_backoff(model: str, contents, config: Optional[types.GenerateContentConfig] = None, max_tries: int = 2, force_model: str = None) -> str:
     # Track total calls for stats
     _api_stats["total_calls"] += 1
     
-    # Build list of models to try: requested model first, then the rest of the chain
-    models_to_try = [model]
-    for m in FALLBACK_CHAIN:
-        if m != model and m not in models_to_try:
-            models_to_try.append(m)
+    # Decide which models to try
+    if force_model:
+        models_to_try = [force_model]
+        print(f"[DEBUG] Forcing usage of model: {force_model}")
+    else:
+        # Build fallback chain
+        models_to_try = [model]
+        for m in FALLBACK_CHAIN:
+            if m != model and m not in models_to_try:
+                models_to_try.append(m)
 
-    # Filter out models that are on cooldown
-    available_models = [m for m in models_to_try if not is_api_on_cooldown(m)]
-    
+    # Filter out cooldown models (unless forced)
+    available_models = []
+    for m in models_to_try:
+        if force_model or not is_api_on_cooldown(m):
+            available_models.append(m)
+        else:
+            print(f"[COOLDOWN] Model {m} is skipping due to cooldown.")
+
     if not available_models:
-        # All models are on cooldown - return cached response or error
-        print("[COOLDOWN] All models are on cooldown. Waiting to save resources.")
-        raise HTTPException(status_code=503, detail="AI Service temporarily on cooldown. Please try again in a few minutes.")
+        print("[COOLDOWN] All models turned down. Waiting resources.")
+        raise HTTPException(status_code=503, detail="AI Service temporarily on cooldown.")
 
     last_error = None
 
@@ -187,18 +196,15 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
         print(f"[DEBUG] Attempting AI generation with model: {model_name}")
         delay = 1.0
         
-        # Try up to max_tries for EACH model (mainly for 503s)
         for attempt in range(1, max_tries + 1):
             try:
-                # Special handling for Gemma: Does NOT support Search Tool
+                # Special handling for Gemma
                 current_config = config
                 if "gemma" in model_name.lower():
-                    # Remove search config for Gemma to avoid 400 INVALID_ARGUMENT
                     current_config = None
 
                 resp = client.models.generate_content(model=model_name, contents=contents, config=current_config)
 
-                # Check if search was used
                 if resp.candidates and resp.candidates[0].grounding_metadata and resp.candidates[0].grounding_metadata.search_entry_point:
                     print(f"[DEBUG] Google Search used by model: {model_name}")
                 
@@ -209,25 +215,27 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
                 error_str = str(e)
                 print(f"[WARN] Model {model_name} (Attempt {attempt}/{max_tries}) failed: {error_str}")
 
-                # Check for 429 Rate Limit - set cooldown
                 if "429" in error_str or "Resource has been exhausted" in error_str:
                     set_api_cooldown(model_name, _API_COOLDOWN_DURATION)
-                    break  # Move to next model
+                    break # Rate limit -> Next model
 
-                # Check for other fatal errors
                 is_fatal = any(x in error_str for x in ["404", "400", "Not Found", "Invalid Argument"])
-                
                 if is_fatal:
                     break 
 
-                # If it's a 503 (Overloaded) -> Wait and retry THIS model
                 if "503" in error_str:
                     if attempt < max_tries:
                         time.sleep(delay)
                         delay = min(delay * 2, 5.0)
                         continue
                 
-                # For safety, if we hit other unknown errors, we also break to try the next model
+                break # Unknown error -> Next model
+
+    # If forced model failed, we should probably let caller know specifically
+    if force_model:
+        raise HTTPException(status_code=503, detail=f"Forced model {force_model} failed: {last_error}")
+
+    raise HTTPException(status_code=500, detail=f"AI Service Temporarily Unavailable. Last error: {last_error}")
                 break
 
     # If we exit the loop, all models failed
@@ -562,7 +570,7 @@ def refresh_nutrition_plan(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/users/{user_id}/refresh-tips")
-def refresh_daily_tips(user_id: int, db: Session = Depends(get_db)):
+def refresh_daily_tips(user_id: int, model: Optional[str] = None, db: Session = Depends(get_db)):
     """Generate new daily tips for user"""
     user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
     if not user:
@@ -582,7 +590,7 @@ def refresh_daily_tips(user_id: int, db: Session = Depends(get_db)):
 ให้เคล็ดลับที่ทำได้จริง สั้นกระชับ 1 ประโยค เป็นกันเอง
 ตอบเป็น JSON array เท่านั้น: ["tip1", "tip2", ...]"""
 
-        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt])
+        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt], force_model=model)
         
         # Parse JSON array
         json_match = re.search(r'\[[\s\S]*\]', result_text)
@@ -600,7 +608,7 @@ def refresh_daily_tips(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/users/{user_id}/adaptive-plan")
-def generate_adaptive_plan(user_id: int, db: Session = Depends(get_db)):
+def generate_adaptive_plan(user_id: int, model: Optional[str] = None, db: Session = Depends(get_db)):
     """Generate adaptive nutrition plan based on user adherence analysis"""
     user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
     if not user:
@@ -686,7 +694,7 @@ def generate_adaptive_plan(user_id: int, db: Session = Depends(get_db)):
   "motivation": "ข้อความให้กำลังใจเพื่อน 1 ประโยค"
 }}"""
 
-        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt], config=SEARCH_CONFIG)
+        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt], config=SEARCH_CONFIG, force_model=model)
         
         # Parse JSON response
         json_match = re.search(r'\{[\s\S]*\}', result_text)

@@ -2,7 +2,7 @@
 
 # =============================================
 #   NutriFriend AI - Update Daily Tips Script
-#   Run via cron every 3 hours to refresh tips
+#   Script-Controlled Model Selection
 # =============================================
 
 # Configuration
@@ -10,16 +10,20 @@ PROJECT_DIR="/home/os/Project-Os3/Project-Os"
 DB_FILE="$PROJECT_DIR/backend/nutrifriend.db"
 API_URL="http://localhost:8000"
 LOG_FILE="$PROJECT_DIR/logs/tips_update.log"
+API_LIMITER="$PROJECT_DIR/api_limiter.sh"
 
 # Create log directory
 mkdir -p "$PROJECT_DIR/logs"
+
+# Ensure API Limiter is executable
+chmod +x "$API_LIMITER"
 
 # Log function
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-log "Starting tips update..."
+log "Starting tips update (Smart Mode)..."
 
 # Check if database exists
 if [ ! -f "$DB_FILE" ]; then
@@ -46,20 +50,41 @@ SUCCESS_COUNT=0
 FAIL_COUNT=0
 
 for USER_ID in $USER_IDS; do
-    log "[INFO] Updating tips for user ID: $USER_ID"
+    log "[INFO] Processing user ID: $USER_ID"
     
-    RESPONSE=$(curl -s -X POST "$API_URL/users/$USER_ID/refresh-tips")
+    # === 1. FIND AVAILABLE MODEL ===
+    SELECTED_MODEL=$("$API_LIMITER" available)
+    
+    if [ "$SELECTED_MODEL" = "NONE" ] || [ -z "$SELECTED_MODEL" ]; then
+        log "[STOP] All models are on cooldown. Stopping update to save resources."
+        break
+    fi
+    
+    log "[INFO] Selected model: $SELECTED_MODEL"
+    
+    # === 2. CALL API WITH SELECTED MODEL ===
+    RESPONSE=$(curl -s -X POST "$API_URL/users/$USER_ID/refresh-tips?model=$SELECTED_MODEL")
     STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
     
     if [ "$STATUS" = "success" ]; then
-        log "[SUCCESS] User $USER_ID tips updated"
+        log "[SUCCESS] User $USER_ID tips updated using $SELECTED_MODEL"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     else
-        log "[WARN] User $USER_ID update failed: $RESPONSE"
-        FAIL_COUNT=$((FAIL_COUNT + 1))
+        # === 3. HANDLE RATE LIMIT ===
+        # If 503/429 occurs, mark this model as cooldown in local limiter
+        if echo "$RESPONSE" | grep -qE "503|429|Resource has been exhausted"; then
+            log "[RATE-LIMIT] Model $SELECTED_MODEL hit 429/503. Marking as cooldown."
+            "$API_LIMITER" set "$SELECTED_MODEL"
+            
+            # Retry logic could go here, but for simplicity we skip to next user/loop
+            FAIL_COUNT=$((FAIL_COUNT + 1))
+        else
+            log "[WARN] User $USER_ID update failed: $RESPONSE"
+            FAIL_COUNT=$((FAIL_COUNT + 1))
+        fi
     fi
     
-    # Small delay to avoid rate limiting
+    # Small delay
     sleep 2
 done
 
