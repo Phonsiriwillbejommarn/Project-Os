@@ -82,6 +82,41 @@ class Message(Base):
     date = Column(String(10), nullable=False)  # ✅ YYYY-MM-DD
 
 
+class NutritionPlan(Base):
+    """ตารางเก็บแผนโภชนาการที่ AI วางไว้"""
+    __tablename__ = "nutrition_plans"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    
+    # ข้อมูลแผน
+    plan_type = Column(String(50), nullable=False)  # weekly, daily, custom
+    week_start_date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    week_end_date = Column(String(10), nullable=False)    # YYYY-MM-DD
+    
+    # เป้าหมายที่ AI กำหนด
+    target_calories = Column(Float, nullable=True)
+    target_protein = Column(Float, nullable=True)
+    target_carbs = Column(Float, nullable=True)
+    target_fat = Column(Float, nullable=True)
+    
+    # แผนรายละเอียด (JSON)
+    daily_plan = Column(Text, nullable=True)       # แผนรายวัน (JSON array)
+    meal_suggestions = Column(Text, nullable=True)  # แนะนำเมนู (JSON)
+    
+    # การวิเคราะห์
+    analysis = Column(Text, nullable=True)          # วิเคราะห์จาก AI
+    motivation = Column(Text, nullable=True)        # ข้อความให้กำลังใจ
+    
+    # สถานะการทำตาม
+    adherence_rate = Column(Float, nullable=True)   # อัตราทำตามแผน (%)
+    can_follow = Column(Integer, default=1)         # 1=ทำตามได้, 0=ปรับแผนแล้ว
+    
+    # Timestamps
+    created_at = Column(Integer, nullable=False)    # Unix timestamp
+    updated_at = Column(Integer, nullable=True)     # Unix timestamp
+
+
 # Database setup
 DATABASE_URL = "sqlite:///./nutrifriend.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})

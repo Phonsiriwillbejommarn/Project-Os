@@ -32,7 +32,7 @@ from google.genai import types
 from google.genai.errors import ServerError
 from duckduckgo_search import DDGS
 
-from models import init_db, get_db, UserProfile, FoodItem, Message, MessageRole
+from models import init_db, get_db, UserProfile, FoodItem, Message, MessageRole, NutritionPlan
 from schemas import (
     UserProfileCreate, UserProfileResponse, UserProfileUpdate,
     FoodItemCreate, FoodItemResponse,
@@ -737,6 +737,134 @@ def generate_adaptive_plan(user_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"[ERROR] Adaptive plan failed: {e}")
         return {"status": "error", "reason": str(e)}
+
+
+# ==================== Nutrition Plan Endpoints ====================
+
+class NutritionPlanCreate(BaseModel):
+    plan_type: str = "weekly"
+    week_start_date: str
+    week_end_date: str
+    target_calories: Optional[float] = None
+    target_protein: Optional[float] = None
+    target_carbs: Optional[float] = None
+    target_fat: Optional[float] = None
+    daily_plan: Optional[str] = None
+    meal_suggestions: Optional[str] = None
+    analysis: Optional[str] = None
+    motivation: Optional[str] = None
+
+
+class NutritionPlanResponse(BaseModel):
+    id: int
+    user_id: int
+    plan_type: str
+    week_start_date: str
+    week_end_date: str
+    target_calories: Optional[float]
+    target_protein: Optional[float]
+    target_carbs: Optional[float]
+    target_fat: Optional[float]
+    daily_plan: Optional[str]
+    meal_suggestions: Optional[str]
+    analysis: Optional[str]
+    motivation: Optional[str]
+    adherence_rate: Optional[float]
+    can_follow: int
+    created_at: int
+    updated_at: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+@app.post("/users/{user_id}/nutrition-plans", response_model=NutritionPlanResponse)
+def create_nutrition_plan(user_id: int, plan: NutritionPlanCreate, db: Session = Depends(get_db)):
+    """สร้างแผนโภชนาการใหม่"""
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_plan = NutritionPlan(
+        user_id=user_id,
+        plan_type=plan.plan_type,
+        week_start_date=plan.week_start_date,
+        week_end_date=plan.week_end_date,
+        target_calories=plan.target_calories or user.target_calories,
+        target_protein=plan.target_protein or user.target_protein,
+        target_carbs=plan.target_carbs or user.target_carbs,
+        target_fat=plan.target_fat or user.target_fat,
+        daily_plan=plan.daily_plan,
+        meal_suggestions=plan.meal_suggestions,
+        analysis=plan.analysis,
+        motivation=plan.motivation,
+        adherence_rate=None,
+        can_follow=1,
+        created_at=int(time.time()),
+        updated_at=None
+    )
+    db.add(db_plan)
+    db.commit()
+    db.refresh(db_plan)
+    return db_plan
+
+
+@app.get("/users/{user_id}/nutrition-plans", response_model=List[NutritionPlanResponse])
+def get_nutrition_plans(user_id: int, limit: int = 10, db: Session = Depends(get_db)):
+    """ดึงแผนโภชนาการทั้งหมดของผู้ใช้"""
+    plans = db.query(NutritionPlan).filter(
+        NutritionPlan.user_id == user_id
+    ).order_by(NutritionPlan.created_at.desc()).limit(limit).all()
+    return plans
+
+
+@app.get("/users/{user_id}/nutrition-plans/current", response_model=NutritionPlanResponse)
+def get_current_plan(user_id: int, db: Session = Depends(get_db)):
+    """ดึงแผนโภชนาการปัจจุบัน (ล่าสุด)"""
+    plan = db.query(NutritionPlan).filter(
+        NutritionPlan.user_id == user_id
+    ).order_by(NutritionPlan.created_at.desc()).first()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="No nutrition plan found")
+    return plan
+
+
+@app.put("/users/{user_id}/nutrition-plans/{plan_id}")
+def update_nutrition_plan(user_id: int, plan_id: int, adherence_rate: float = None, can_follow: int = None, db: Session = Depends(get_db)):
+    """อัปเดตสถานะแผน (adherence rate, can_follow)"""
+    plan = db.query(NutritionPlan).filter(
+        NutritionPlan.id == plan_id,
+        NutritionPlan.user_id == user_id
+    ).first()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    if adherence_rate is not None:
+        plan.adherence_rate = adherence_rate
+    if can_follow is not None:
+        plan.can_follow = can_follow
+    plan.updated_at = int(time.time())
+    
+    db.commit()
+    return {"status": "success", "message": "Plan updated"}
+
+
+@app.delete("/users/{user_id}/nutrition-plans/{plan_id}")
+def delete_nutrition_plan(user_id: int, plan_id: int, db: Session = Depends(get_db)):
+    """ลบแผนโภชนาการ"""
+    plan = db.query(NutritionPlan).filter(
+        NutritionPlan.id == plan_id,
+        NutritionPlan.user_id == user_id
+    ).first()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    db.delete(plan)
+    db.commit()
+    return {"status": "success", "message": "Plan deleted"}
 
 
 # ==================== Food Item Endpoints ====================
