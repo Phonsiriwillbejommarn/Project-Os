@@ -113,6 +113,46 @@ def inflight_release(key: str):
     _inflight.pop(key, None)
 
 # ============================================================
+# Smart API Cooldown System - ประหยัด API calls เมื่อ rate limited
+# ============================================================
+
+# Track API cooldown per model
+_api_cooldown = {}  # model_name -> cooldown_until_timestamp
+_API_COOLDOWN_DURATION = 300  # หยุดยิง 5 นาทีเมื่อโดน 429
+_api_stats = {
+    "total_calls": 0,
+    "rate_limited": 0,
+    "saved_calls": 0,  # จำนวน calls ที่ประหยัดได้
+    "last_429_time": None
+}
+
+def is_api_on_cooldown(model_name: str) -> bool:
+    """ตรวจสอบว่า model นี้อยู่ในช่วง cooldown หรือไม่"""
+    now = time.time()
+    cooldown_until = _api_cooldown.get(model_name, 0)
+    if cooldown_until > now:
+        remaining = int(cooldown_until - now)
+        print(f"[COOLDOWN] Model {model_name} is on cooldown for {remaining}s more. Skipping to save resources.")
+        _api_stats["saved_calls"] += 1
+        return True
+    return False
+
+def set_api_cooldown(model_name: str, duration: int = _API_COOLDOWN_DURATION):
+    """ตั้ง cooldown สำหรับ model ที่โดน rate limit"""
+    _api_cooldown[model_name] = time.time() + duration
+    _api_stats["rate_limited"] += 1
+    _api_stats["last_429_time"] = time.time()
+    print(f"[COOLDOWN] Model {model_name} rate limited. Cooling down for {duration}s.")
+
+def get_api_stats():
+    """ดึงสถิติการใช้ API"""
+    return {
+        **_api_stats,
+        "cooldown_models": {k: int(v - time.time()) for k, v in _api_cooldown.items() if v > time.time()},
+        "efficiency": f"{(_api_stats['saved_calls'] / max(_api_stats['total_calls'], 1)) * 100:.1f}%" if _api_stats['total_calls'] > 0 else "N/A"
+    }
+
+# ============================================================
 # Gemini helper: retry/backoff + map 503 properly
 # ============================================================
 # Fallback chain as requested
@@ -124,15 +164,26 @@ FALLBACK_CHAIN = [
 ]
 
 def gemini_generate_with_backoff(model: str, contents, config: Optional[types.GenerateContentConfig] = None, max_tries: int = 2) -> str:
+    # Track total calls for stats
+    _api_stats["total_calls"] += 1
+    
     # Build list of models to try: requested model first, then the rest of the chain
     models_to_try = [model]
     for m in FALLBACK_CHAIN:
         if m != model and m not in models_to_try:
             models_to_try.append(m)
 
+    # Filter out models that are on cooldown
+    available_models = [m for m in models_to_try if not is_api_on_cooldown(m)]
+    
+    if not available_models:
+        # All models are on cooldown - return cached response or error
+        print("[COOLDOWN] All models are on cooldown. Waiting to save resources.")
+        raise HTTPException(status_code=503, detail="AI Service temporarily on cooldown. Please try again in a few minutes.")
+
     last_error = None
 
-    for model_name in models_to_try:
+    for model_name in available_models:
         print(f"[DEBUG] Attempting AI generation with model: {model_name}")
         delay = 1.0
         
@@ -149,7 +200,7 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
 
                 # Check if search was used
                 if resp.candidates and resp.candidates[0].grounding_metadata and resp.candidates[0].grounding_metadata.search_entry_point:
-                    print(f"[DEBUG] 🔍 Google Search used by model: {model_name}")
+                    print(f"[DEBUG] Google Search used by model: {model_name}")
                 
                 return (resp.text or "").strip()
 
@@ -158,14 +209,15 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
                 error_str = str(e)
                 print(f"[WARN] Model {model_name} (Attempt {attempt}/{max_tries}) failed: {error_str}")
 
-                # Check for fatal errors that suggest "Move to next model immediately"
-                # 429 = Quota exceeded / Too many requests
-                # 404 = Model not found
-                # 400 = Bad Request (Invalid Argument) -> e.g. model doesn't support search tools
-                is_fatal = any(x in error_str for x in ["429", "404", "400", "Resource has been exhausted", "Not Found", "Invalid Argument"])
+                # Check for 429 Rate Limit - set cooldown
+                if "429" in error_str or "Resource has been exhausted" in error_str:
+                    set_api_cooldown(model_name, _API_COOLDOWN_DURATION)
+                    break  # Move to next model
+
+                # Check for other fatal errors
+                is_fatal = any(x in error_str for x in ["404", "400", "Not Found", "Invalid Argument"])
                 
                 if is_fatal:
-                    # If this model is broken/full/incompatible, don't retry IT. Move to NEXT model in chain.
                     break 
 
                 # If it's a 503 (Overloaded) -> Wait and retry THIS model
@@ -210,10 +262,24 @@ app.add_middleware(
 )
 
 
-
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/api-stats")
+async def api_statistics():
+    """ดูสถิติการใช้ API และ cooldown status เพื่อประหยัด resources"""
+    stats = get_api_stats()
+    return {
+        "total_api_calls": stats["total_calls"],
+        "rate_limited_count": stats["rate_limited"],
+        "saved_calls": stats["saved_calls"],
+        "efficiency": stats["efficiency"],
+        "cooldown_models": stats["cooldown_models"],
+        "last_rate_limit": stats["last_429_time"],
+        "message": "Models on cooldown will be skipped to save resources"
+    }
 
 
 # ============================================================
