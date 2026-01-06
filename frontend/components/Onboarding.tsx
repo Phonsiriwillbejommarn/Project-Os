@@ -92,12 +92,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Server Error Response:", errorText);
+
+        let errorMessage = 'การลงทะเบียนล้มเหลว';
         try {
           const errorData = JSON.parse(errorText);
-          throw new Error(errorData.detail || 'การลงทะเบียนล้มเหลว');
+          errorMessage = errorData.detail || errorMessage;
         } catch (e) {
-          throw new Error(`Server Error (${response.status}): ${errorText.substring(0, 100)}`);
+          errorMessage = `Server Error (${response.status}): ${errorText.substring(0, 100)}`;
         }
+        throw new Error(errorMessage);
       }
 
       const responseText = await response.text();

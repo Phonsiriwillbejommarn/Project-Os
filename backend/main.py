@@ -21,7 +21,9 @@ load_dotenv()
 
 from google import genai
 from google.genai import types
+
 from google.genai.errors import ServerError
+from duckduckgo_search import DDGS
 
 from models import init_db, get_db, UserProfile, FoodItem, Message, MessageRole
 from schemas import (
@@ -230,6 +232,18 @@ SEARCH_CONFIG = types.GenerateContentConfig(
     tools=[types.Tool(google_search=types.GoogleSearch())],
     response_mime_type="text/plain" 
 )
+
+def perform_duckduckgo_search(query: str) -> str:
+    try:
+        print(f"[DEBUG] Performing DuckDuckGo search for: {query}")
+        results = DDGS().text(query, max_results=3)
+        if not results:
+            return "No search results found."
+        summary = "\n".join([f"- {r['title']}: {r['body']}" for r in results])
+        return summary
+    except Exception as e:
+        print(f"DuckDuckGo Search failed: {e}")
+        return "Search unavailable."
 
 # ==================== User Profile Endpoints ====================
 
@@ -658,7 +672,18 @@ async def chat_with_ai(request: ChatRequest, req: Request, db: Session = Depends
 - ถ้าเพื่อนถามเรื่องป่วย ให้แนะนำให้ปรึกษาหมอด้วยความเป็นห่วงเสมอ
 - "Google Search" จะช่วยหาข้อมูลล่าสุดให้คุณ อย่าลืมใช้ข้อมูลนั้นมาเล่าต่อเพื่อนนะ"""
 
-    contents = [context, f"\nเพื่อนถามว่า: {request.message}"]
+    # Perform DuckDuckGo search to augment context for ALL models (including Gemma)
+    search_context = ""
+    try:
+        # Simple heuristic: if message is short or looks like a question, search.
+        # For now, let's search for everything to be safe as requested.
+        search_results = perform_duckduckgo_search(request.message)
+        if search_results and "Search unavailable" not in search_results:
+            search_context = f"\n\n=== ข้อมูลเพิ่มเติมจาก DuckDuckGo ===\n{search_results}\n=====================================\n"
+    except Exception as e:
+        print(f"[WARN] DDG Search injection failed: {e}")
+
+    contents = [context + search_context, f"\nเพื่อนถามว่า: {request.message}"]
 
     img_sig = ""
     if request.image:
