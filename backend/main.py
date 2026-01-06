@@ -721,6 +721,35 @@ def generate_adaptive_plan(user_id: int, db: Session = Depends(get_db)):
 💪 {motivation}"""
             
             user.ai_assessment = new_assessment
+            
+            # ==================== บันทึกลงตาราง nutrition_plans ====================
+            from datetime import datetime, timedelta
+            
+            # คำนวณวันเริ่มและสิ้นสุดของแผน
+            plan_start = datetime.now().date()
+            plan_end = plan_start + timedelta(days=6)
+            
+            # สร้างแผนใหม่
+            new_plan = NutritionPlan(
+                user_id=user_id,
+                plan_type="weekly",
+                week_start_date=plan_start.isoformat(),
+                week_end_date=plan_end.isoformat(),
+                target_calories=user.target_calories,
+                target_protein=user.target_protein,
+                target_carbs=user.target_carbs,
+                target_fat=user.target_fat,
+                daily_plan=json.dumps({"plan": weekly_plan}, ensure_ascii=False),
+                meal_suggestions=None,
+                analysis=analysis,
+                motivation=motivation,
+                adherence_rate=round(overall_adherence, 1),
+                can_follow=1 if can_follow else 0,
+                created_at=int(time.time()),
+                updated_at=None
+            )
+            db.add(new_plan)
+            
             db.commit()
             
             return {
@@ -729,7 +758,8 @@ def generate_adaptive_plan(user_id: int, db: Session = Depends(get_db)):
                 "adherence_rate": round(overall_adherence, 1),
                 "new_targets": new_targets,
                 "analysis": analysis,
-                "motivation": motivation
+                "motivation": motivation,
+                "plan_id": new_plan.id
             }
         else:
             return {"status": "error", "reason": "Could not parse AI response"}
