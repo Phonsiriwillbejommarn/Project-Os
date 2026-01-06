@@ -1,5 +1,5 @@
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,10 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+# Dependencies
+node_modules/
 
+# Build
 dist-ssr
+
+# Local env files
 *.local
+.env
+.env.local
+frontend/.env.local
+backend/.env
 
 # Editor directories and files
 .vscode/*
@@ -28,8 +36,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
-.env
 .venv
 env/
+backend/venv/
+
+# Database
 *.db
 backend/nutrifriend.db
+
+# Backups and Reports (generated on Pi)
+backups/
+reports/
+
+# OS files
+Thumbs.db
+.Spotlight-V100
+.Trashes
