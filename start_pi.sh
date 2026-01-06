@@ -54,4 +54,5 @@ echo "=================================================="
 echo ""
 echo "🚀 Server is running! (Press Ctrl+C to stop)"
 echo ""
+export PYTHONIOENCODING=utf-8
 uvicorn main:app --host 0.0.0.0 --port 8000

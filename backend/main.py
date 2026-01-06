@@ -11,6 +11,13 @@ import json
 import re
 import time
 import hashlib
+import sys
+import io
+
+# Force UTF-8 encoding for stdout/stderr to prevent crashes on some terminals
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 from collections import defaultdict, deque
 from pydantic import BaseModel
 from dotenv import load_dotenv
