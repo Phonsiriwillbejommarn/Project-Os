@@ -433,6 +433,106 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"message": "User deleted successfully"}
 
 
+# ==================== Refresh Plan & Tips Endpoints ====================
+
+@app.post("/users/{user_id}/refresh-plan")
+def refresh_nutrition_plan(user_id: int, db: Session = Depends(get_db)):
+    """Refresh AI nutrition plan based on current food logs"""
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not client:
+        return {"status": "skipped", "reason": "AI not available"}
+
+    # Get recent food logs (last 7 days)
+    from datetime import datetime, timedelta
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=6)
+    
+    foods = db.query(FoodItem).filter(
+        FoodItem.user_id == user_id,
+        FoodItem.date >= start_date.isoformat(),
+        FoodItem.date <= end_date.isoformat()
+    ).all()
+
+    # Calculate current intake
+    total_calories = sum(f.calories for f in foods)
+    total_protein = sum(f.protein for f in foods)
+    total_carbs = sum(f.carbs for f in foods)
+    total_fat = sum(f.fat for f in foods)
+    avg_calories = round(total_calories / 7, 0) if foods else 0
+
+    food_summary = ", ".join([f.name for f in foods[:10]]) if foods else "ยังไม่มีข้อมูล"
+
+    try:
+        prompt = f"""บทบาท: คุณคือ "NutriFriend" เพื่อนซี้โภชนาการ
+        
+ข้อมูลเพื่อน {user.name}:
+- อายุ: {user.age} ปี | เพศ: {user.gender}
+- น้ำหนัก: {user.weight} kg | ส่วนสูง: {user.height} cm
+- เป้าหมาย: {user.goal}
+- โรคประจำตัว: {user.conditions or 'ไม่มี'}
+
+สรุปอาหาร 7 วันที่ผ่านมา:
+- แคลอรี่รวม: {total_calories:.0f} kcal (เฉลี่ย {avg_calories:.0f}/วัน)
+- โปรตีน: {total_protein:.0f}g | คาร์บ: {total_carbs:.0f}g | ไขมัน: {total_fat:.0f}g
+- อาหารที่กิน: {food_summary}
+
+ช่วยวิเคราะห์และให้คำแนะนำสั้นๆ (2-3 ย่อหน้า) ว่าเพื่อนกินตามเป้าหมายไหม และควรปรับอะไรบ้าง
+ใช้ภาษาเป็นกันเอง เหมือนเพื่อนคุยกัน ตอบเป็น Markdown"""
+
+        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt])
+        
+        # Update user's ai_assessment
+        user.ai_assessment = result_text
+        db.commit()
+        
+        return {"status": "success", "assessment": result_text}
+
+    except Exception as e:
+        print(f"[ERROR] Refresh plan failed: {e}")
+        return {"status": "error", "reason": str(e)}
+
+
+@app.post("/users/{user_id}/refresh-tips")
+def refresh_daily_tips(user_id: int, db: Session = Depends(get_db)):
+    """Generate new daily tips for user"""
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not client:
+        return {"status": "skipped", "reason": "AI not available"}
+
+    try:
+        prompt = f"""บทบาท: คุณคือ "NutriFriend" เพื่อนซี้โภชนาการ
+
+สร้างเคล็ดลับดูแลสุขภาพ 7 ข้อ สำหรับเพื่อน {user.name}
+- เป้าหมาย: {user.goal}
+- โรคประจำตัว: {user.conditions or 'ไม่มี'}
+- ข้อจำกัดอาหาร: {user.dietary_restrictions or 'ไม่มี'}
+
+ให้เคล็ดลับที่ทำได้จริง สั้นกระชับ 1 ประโยค เป็นกันเอง
+ตอบเป็น JSON array เท่านั้น: ["tip1", "tip2", ...]"""
+
+        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt])
+        
+        # Parse JSON array
+        json_match = re.search(r'\[[\s\S]*\]', result_text)
+        if json_match:
+            tips = json.loads(json_match.group())
+            user.daily_tips = json.dumps(tips, ensure_ascii=False)
+            db.commit()
+            return {"status": "success", "tips": tips}
+        else:
+            return {"status": "error", "reason": "Could not parse tips"}
+
+    except Exception as e:
+        print(f"[ERROR] Refresh tips failed: {e}")
+        return {"status": "error", "reason": str(e)}
+
+
 # ==================== Food Item Endpoints ====================
 
 @app.post("/users/{user_id}/foods", response_model=FoodItemResponse)
@@ -455,6 +555,21 @@ def add_food_item(user_id: int, food: FoodItemCreate, db: Session = Depends(get_
     db.add(db_food)
     db.commit()
     db.refresh(db_food)
+
+    # Trigger refresh-plan in background (non-blocking)
+    import threading
+    def background_refresh():
+        try:
+            from models import SessionLocal
+            bg_db = SessionLocal()
+            refresh_nutrition_plan(user_id, bg_db)
+            bg_db.close()
+        except Exception as e:
+            print(f"[WARN] Background refresh failed: {e}")
+
+    thread = threading.Thread(target=background_refresh)
+    thread.start()
+
     return db_food
 
 
@@ -506,6 +621,94 @@ def get_daily_stats(user_id: int, date: str, db: Session = Depends(get_db)):
         fat=sum(f.fat for f in foods)
     )
     return stats
+
+
+# ==================== Weekly Report Endpoint ====================
+
+class WeeklyReportResponse(BaseModel):
+    period_start: str
+    period_end: str
+    total_meals: int
+    total_calories: float
+    avg_calories: float
+    total_protein: float
+    total_carbs: float
+    total_fat: float
+    target_calories: Optional[float]
+    status: str  # "on_track", "under", "over"
+    daily_breakdown: list
+
+
+@app.get("/users/{user_id}/weekly-report", response_model=WeeklyReportResponse)
+def get_weekly_report(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Calculate date range (last 7 days)
+    from datetime import datetime, timedelta
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=6)
+
+    # Get all food items in the date range
+    foods = db.query(FoodItem).filter(
+        FoodItem.user_id == user_id,
+        FoodItem.date >= start_date.isoformat(),
+        FoodItem.date <= end_date.isoformat()
+    ).all()
+
+    # Calculate totals
+    total_calories = sum(f.calories for f in foods)
+    total_protein = sum(f.protein for f in foods)
+    total_carbs = sum(f.carbs for f in foods)
+    total_fat = sum(f.fat for f in foods)
+    total_meals = len(foods)
+    avg_calories = round(total_calories / 7, 0) if total_calories > 0 else 0
+
+    # Get target calories
+    target_calories = user.target_calories
+
+    # Determine status
+    if target_calories:
+        weekly_target = target_calories * 7
+        diff_percent = ((total_calories - weekly_target) / weekly_target) * 100 if weekly_target > 0 else 0
+        if abs(diff_percent) <= 10:
+            status = "on_track"
+        elif total_calories < weekly_target:
+            status = "under"
+        else:
+            status = "over"
+    else:
+        status = "on_track"
+
+    # Build daily breakdown
+    daily_breakdown = []
+    for i in range(7):
+        day = start_date + timedelta(days=i)
+        day_str = day.isoformat()
+        day_foods = [f for f in foods if f.date == day_str]
+        daily_breakdown.append({
+            "date": day_str,
+            "meals": len(day_foods),
+            "calories": round(sum(f.calories for f in day_foods), 0),
+            "protein": round(sum(f.protein for f in day_foods), 1),
+            "carbs": round(sum(f.carbs for f in day_foods), 1),
+            "fat": round(sum(f.fat for f in day_foods), 1)
+        })
+
+    return WeeklyReportResponse(
+        period_start=start_date.isoformat(),
+        period_end=end_date.isoformat(),
+        total_meals=total_meals,
+        total_calories=round(total_calories, 0),
+        avg_calories=avg_calories,
+        total_protein=round(total_protein, 1),
+        total_carbs=round(total_carbs, 1),
+        total_fat=round(total_fat, 1),
+        target_calories=target_calories,
+        status=status,
+        daily_breakdown=daily_breakdown
+    )
 
 
 # ==================== Message Endpoints ====================

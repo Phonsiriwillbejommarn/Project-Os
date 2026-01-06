@@ -1,12 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, DailyStats, Goal, Gender, ActivityLevel, FoodItem } from '../types';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine
 } from 'recharts';
-import { Target, Utensils, CheckCircle, CalendarDays, Sparkles } from 'lucide-react';
+import { Target, Utensils, CheckCircle, CalendarDays, Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import FoodLogger from './FoodLogger';
 import ReactMarkdown from 'react-markdown';
+
+// Weekly Report Interface
+interface WeeklyReport {
+  period_start: string;
+  period_end: string;
+  total_meals: number;
+  total_calories: number;
+  avg_calories: number;
+  total_protein: number;
+  total_carbs: number;
+  total_fat: number;
+  target_calories: number | null;
+  status: 'on_track' | 'under' | 'over';
+  daily_breakdown: Array<{
+    date: string;
+    meals: number;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  }>;
+}
 
 interface DashboardProps {
   user: UserProfile;
@@ -23,6 +45,26 @@ const Dashboard: React.FC<DashboardProps> = ({
   user, stats, allLogs, selectedDate,
   currentLogs, onAddLog, onRemoveLog, navigateToChat
 }) => {
+  // Weekly Report State
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null);
+
+  // Fetch Weekly Report
+  useEffect(() => {
+    const fetchWeeklyReport = async () => {
+      if (!user.id) return;
+      try {
+        const response = await fetch(`/users/${user.id}/weekly-report`);
+        if (response.ok) {
+          const data = await response.json();
+          setWeeklyReport(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch weekly report:', error);
+      }
+    };
+    fetchWeeklyReport();
+  }, [user.id, allLogs.length]);
+
   const calculateBMR = () => {
     let bmr = (10 * user.weight) + (6.25 * user.height) - (5 * user.age);
     return user.gender === Gender.Male ? bmr + 5 : bmr - 161;
@@ -208,6 +250,60 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center"><span className="w-3 h-1 border-t border-dashed border-blue-500 mr-1"></span> เป้าหมาย ({targetCalories})</div>
           </div>
         </div>
+
+        {/* Weekly Summary Card */}
+        {weeklyReport && (
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-2xl shadow-sm border border-indigo-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-indigo-700 flex items-center">
+                {weeklyReport.status === 'on_track' && <Minus className="w-5 h-5 mr-2 text-emerald-500" />}
+                {weeklyReport.status === 'under' && <TrendingDown className="w-5 h-5 mr-2 text-amber-500" />}
+                {weeklyReport.status === 'over' && <TrendingUp className="w-5 h-5 mr-2 text-red-500" />}
+                สรุปประจำสัปดาห์
+              </h3>
+              <span className={`text-xs px-2 py-1 rounded-full ${weeklyReport.status === 'on_track' ? 'bg-emerald-100 text-emerald-700' :
+                  weeklyReport.status === 'under' ? 'bg-amber-100 text-amber-700' :
+                    'bg-red-100 text-red-700'
+                }`}>
+                {weeklyReport.status === 'on_track' && 'ตามเป้าหมาย'}
+                {weeklyReport.status === 'under' && 'ต่ำกว่าเป้า'}
+                {weeklyReport.status === 'over' && 'เกินเป้า'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-white/60 p-3 rounded-xl">
+                <p className="text-xs text-gray-500">แคลอรี่รวม</p>
+                <p className="text-xl font-bold text-indigo-600">{weeklyReport.total_calories.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">kcal</p>
+              </div>
+              <div className="bg-white/60 p-3 rounded-xl">
+                <p className="text-xs text-gray-500">เฉลี่ยต่อวัน</p>
+                <p className="text-xl font-bold text-purple-600">{weeklyReport.avg_calories.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">kcal</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-white/60 p-2 rounded-lg">
+                <p className="text-xs text-gray-500">โปรตีน</p>
+                <p className="text-sm font-semibold text-emerald-600">{weeklyReport.total_protein}g</p>
+              </div>
+              <div className="bg-white/60 p-2 rounded-lg">
+                <p className="text-xs text-gray-500">คาร์บ</p>
+                <p className="text-sm font-semibold text-amber-600">{weeklyReport.total_carbs}g</p>
+              </div>
+              <div className="bg-white/60 p-2 rounded-lg">
+                <p className="text-xs text-gray-500">ไขมัน</p>
+                <p className="text-sm font-semibold text-red-500">{weeklyReport.total_fat}g</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-4 text-center">
+              {weeklyReport.period_start} - {weeklyReport.period_end} ({weeklyReport.total_meals} มื้อ)
+            </p>
+          </div>
+        )}
 
         {/* Row 2 - Daily Nutrition (✅ ไม่ดันขึ้นแล้ว → ไม่ทับ AI card) */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-[420px]">
