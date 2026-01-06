@@ -6,7 +6,7 @@
 # =============================================
 
 # Define paths
-PROJECT_DIR="/home/pi/nutrifriend-ai-2"
+PROJECT_DIR="/home/os/Project-Os3/Project-Os"
 DB_FILE="$PROJECT_DIR/backend/nutrifriend.db"
 REPORT_DIR="$PROJECT_DIR/reports"
 

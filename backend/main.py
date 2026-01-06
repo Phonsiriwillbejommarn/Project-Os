@@ -533,6 +533,146 @@ def refresh_daily_tips(user_id: int, db: Session = Depends(get_db)):
         return {"status": "error", "reason": str(e)}
 
 
+@app.post("/users/{user_id}/adaptive-plan")
+def generate_adaptive_plan(user_id: int, db: Session = Depends(get_db)):
+    """Generate adaptive nutrition plan based on user adherence analysis"""
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not client:
+        return {"status": "skipped", "reason": "AI not available"}
+
+    # Get food logs for last 7 days
+    from datetime import datetime, timedelta
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=6)
+    
+    foods = db.query(FoodItem).filter(
+        FoodItem.user_id == user_id,
+        FoodItem.date >= start_date.isoformat(),
+        FoodItem.date <= end_date.isoformat()
+    ).all()
+
+    # Calculate actual intake
+    total_calories = sum(f.calories for f in foods)
+    total_protein = sum(f.protein for f in foods)
+    total_carbs = sum(f.carbs for f in foods)
+    total_fat = sum(f.fat for f in foods)
+    
+    # Calculate days with data
+    unique_days = len(set(f.date for f in foods))
+    avg_calories = round(total_calories / max(unique_days, 1), 0)
+    
+    # Get target values
+    target_cal = user.target_calories or 2000
+    target_protein = user.target_protein or 60
+    target_carbs = user.target_carbs or 250
+    target_fat = user.target_fat or 65
+
+    # Calculate adherence rates
+    cal_adherence = min(100, (avg_calories / target_cal) * 100) if target_cal > 0 else 0
+    protein_adherence = min(100, ((total_protein / max(unique_days, 1)) / target_protein) * 100) if target_protein > 0 else 0
+    
+    # Determine if user can follow the plan
+    overall_adherence = (cal_adherence + protein_adherence) / 2
+    can_follow = overall_adherence >= 70  # 70% threshold
+    
+    # Get food patterns
+    food_names = [f.name for f in foods]
+    food_summary = ", ".join(food_names[:15]) if food_names else "ไม่มีข้อมูล"
+    
+    try:
+        prompt = f"""บทบาท: คุณคือ "NutriFriend" เพื่อนซี้โภชนาการที่เข้าใจผู้ใช้
+
+ข้อมูลเพื่อน {user.name}:
+- อายุ: {user.age} ปี | เพศ: {user.gender}
+- น้ำหนัก: {user.weight} kg | ส่วนสูง: {user.height} cm
+- เป้าหมาย: {user.goal}
+- โรคประจำตัว: {user.conditions or 'ไม่มี'}
+- ข้อจำกัดอาหาร: {user.dietary_restrictions or 'ไม่มี'}
+
+เป้าหมายปัจจุบัน:
+- แคลอรี่: {target_cal} kcal/วัน
+- โปรตีน: {target_protein}g | คาร์บ: {target_carbs}g | ไขมัน: {target_fat}g
+
+ผลการปฏิบัติ 7 วันที่ผ่านมา:
+- วันที่มีข้อมูล: {unique_days}/7 วัน
+- แคลอรี่เฉลี่ย: {avg_calories:.0f} kcal/วัน (เป้า {target_cal})
+- อัตราทำตามแผน: {overall_adherence:.0f}%
+- สามารถทำตามแผนได้: {"ได้" if can_follow else "ยังไม่ได้"}
+- อาหารที่กินบ่อย: {food_summary}
+
+ภารกิจ:
+{"เพื่อนทำได้ดี! ให้กำลังใจและปรับเป้าหมายให้ท้าทายขึ้นเล็กน้อย" if can_follow else "เพื่อนยังทำตามแผนไม่ค่อยได้ ช่วยปรับแผนให้ง่ายขึ้น เข้าถึงง่ายขึ้น และเป็นไปได้จริงในชีวิตประจำวัน"}
+
+ตอบเป็น JSON ในรูปแบบ:
+{{
+  "analysis": "วิเคราะห์สั้นๆ 2-3 ประโยค ว่าเพื่อนทำได้ไหม อะไรดี อะไรควรปรับ",
+  "can_follow": {"true" if can_follow else "false"},
+  "new_targets": {{
+    "calories": ตัวเลขใหม่ที่ปรับแล้ว,
+    "protein": ตัวเลขใหม่,
+    "carbs": ตัวเลขใหม่,
+    "fat": ตัวเลขใหม่
+  }},
+  "weekly_plan": "แผนการกินสัปดาห์นี้แบบสั้นๆ ที่ทำได้จริง",
+  "motivation": "ข้อความให้กำลังใจเพื่อน 1 ประโยค"
+}}"""
+
+        result_text = gemini_generate_with_backoff("gemini-3-flash-preview", [prompt], config=SEARCH_CONFIG)
+        
+        # Parse JSON response
+        json_match = re.search(r'\{[\s\S]*\}', result_text)
+        if json_match:
+            result = json.loads(json_match.group())
+            
+            # Update user targets with new adaptive values
+            new_targets = result.get("new_targets", {})
+            if new_targets:
+                user.target_calories = new_targets.get("calories", target_cal)
+                user.target_protein = new_targets.get("protein", target_protein)
+                user.target_carbs = new_targets.get("carbs", target_carbs)
+                user.target_fat = new_targets.get("fat", target_fat)
+            
+            # Update assessment with new plan
+            weekly_plan = result.get("weekly_plan", "")
+            analysis = result.get("analysis", "")
+            motivation = result.get("motivation", "")
+            
+            new_assessment = f"""## แผนโภชนาการสัปดาห์นี้
+
+{analysis}
+
+### เป้าหมายใหม่ที่ปรับแล้ว:
+- แคลอรี่: {user.target_calories} kcal/วัน
+- โปรตีน: {user.target_protein}g | คาร์บ: {user.target_carbs}g | ไขมัน: {user.target_fat}g
+
+### แผนการกิน:
+{weekly_plan}
+
+---
+💪 {motivation}"""
+            
+            user.ai_assessment = new_assessment
+            db.commit()
+            
+            return {
+                "status": "success",
+                "can_follow": can_follow,
+                "adherence_rate": round(overall_adherence, 1),
+                "new_targets": new_targets,
+                "analysis": analysis,
+                "motivation": motivation
+            }
+        else:
+            return {"status": "error", "reason": "Could not parse AI response"}
+
+    except Exception as e:
+        print(f"[ERROR] Adaptive plan failed: {e}")
+        return {"status": "error", "reason": str(e)}
+
+
 # ==================== Food Item Endpoints ====================
 
 @app.post("/users/{user_id}/foods", response_model=FoodItemResponse)

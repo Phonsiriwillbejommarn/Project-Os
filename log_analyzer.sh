@@ -6,7 +6,7 @@
 # =============================================
 
 # Define paths
-PROJECT_DIR="/home/pi/nutrifriend-ai-2"
+PROJECT_DIR="/home/os/Project-Os3/Project-Os"
 LOG_FILE="${1:-/var/log/syslog}"
 OUTPUT_DIR="$PROJECT_DIR/logs"
 

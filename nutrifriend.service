@@ -1,16 +1,16 @@
 [Unit]
 Description=NutriFriend AI Server
-Documentation=https://github.com/your-repo/nutrifriend-ai
+Documentation=https://github.com/Phonsiriwillbejommarn/Project-Os
 After=network.target network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Group=pi
-WorkingDirectory=/home/pi/nutrifriend-ai-2
+User=os
+Group=os
+WorkingDirectory=/home/os/Project-Os3/Project-Os
 Environment=PYTHONIOENCODING=utf-8
-ExecStart=/bin/bash /home/pi/nutrifriend-ai-2/start_pi.sh
+ExecStart=/bin/bash /home/os/Project-Os3/Project-Os/start_pi.sh
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -6,7 +6,7 @@
 # =============================================
 
 # Configuration
-PROJECT_DIR="/home/pi/nutrifriend-ai-2"
+PROJECT_DIR="/home/os/Project-Os3/Project-Os"
 DB_FILE="$PROJECT_DIR/backend/nutrifriend.db"
 API_URL="http://localhost:8000"
 LOG_FILE="$PROJECT_DIR/logs/tips_update.log"

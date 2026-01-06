@@ -12,7 +12,7 @@ echo ""
 
 # Define paths
 SERVICE_NAME="nutrifriend"
-SERVICE_FILE="/home/pi/nutrifriend-ai-2/nutrifriend.service"
+SERVICE_FILE="/home/os/Project-Os3/Project-Os/nutrifriend.service"
 SYSTEMD_PATH="/etc/systemd/system/$SERVICE_NAME.service"
 
 # Check if running as root
