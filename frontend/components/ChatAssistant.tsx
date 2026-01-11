@@ -26,7 +26,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
     id: "welcome",
     role: "model",
     text: `สวัสดีครับคุณ ${userProfile.name}! 👋
-ผมคือ NutriFriend เพื่อนคู่คิดด้านโภชนาการของคุณ
+ผมคือ Health Pi Friend เพื่อนคู่คิดด้านโภชนาการและสุขภาพของคุณ
 
 📸 ส่งรูปอาหารให้ผมช่วยวิเคราะห์ได้
 📊 ผมดูข้อมูลอาหารที่คุณบันทึกวันนี้เพื่อแนะนำเพิ่มเติมได้ครับ`,
@@ -140,7 +140,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
     }
 
     if (res.status === 409) {
-      return "⏳ NutriFriend กำลังคิดคำตอบอยู่แล้วนะ ห้ามกดซ้ำ รอสักครู่แล้วค่อยส่งใหม่อีกทีครับ";
+      return "⏳ Health Pi Friend กำลังคิดคำตอบอยู่แล้วนะ ห้ามกดซ้ำ รอสักครู่แล้วค่อยส่งใหม่อีกทีครับ";
     }
     if (res.status === 429) {
       return "🚦 ส่งถี่เกินไป (429) กรุณารอสักครู่แล้วลองใหม่ครับ";
@@ -234,7 +234,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
       <div className="bg-emerald-600 p-4 text-white flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Bot size={20} />
-          <h3 className="font-semibold">NutriFriend AI</h3>
+          <h3 className="font-semibold">Health Pi Friend</h3>
         </div>
         <button onClick={handleClearHistory} title="ลบแชทของวันนั้น" className="opacity-90 hover:opacity-100">
           <Trash2 size={18} />
@@ -251,7 +251,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
             >
               <div className="text-xs opacity-70 flex items-center gap-1 mb-1">
                 {msg.role === "user" ? <UserIcon size={12} /> : <Bot size={12} />}
-                {msg.role === "user" ? "คุณ" : "NutriFriend"}
+                {msg.role === "user" ? "คุณ" : "Health Pi Friend"}
               </div>
 
               {msg.image && <img src={msg.image} alt="uploaded" className="rounded-lg mb-2 max-h-60" />}
@@ -277,7 +277,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
         {isLoading && (
           <div className="flex gap-2 items-center text-gray-500 text-sm">
             <Loader2 className="animate-spin" size={16} />
-            NutriFriend กำลังคิด...
+            Health Pi Friend กำลังคิด...
           </div>
         )}
 

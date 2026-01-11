@@ -242,7 +242,7 @@ const App: React.FC = () => {
         <div className="hidden md:block p-6">
           <h1 className="text-2xl font-bold text-emerald-600 flex items-center">
             <Leaf className="w-8 h-8 mr-2" />
-            NutriFriend
+            Health Pi Friend
           </h1>
           <p className="text-sm text-gray-500 mt-2">สวัสดี, {userProfile.name}</p>
         </div>

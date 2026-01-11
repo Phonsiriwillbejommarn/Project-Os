@@ -142,7 +142,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
 
           <div className="relative z-10">
             <h1 className="text-3xl font-bold mb-4 flex items-center gap-2">
-              <Heart className="fill-emerald-400 text-emerald-100" /> NutriFriend
+              <Heart className="fill-emerald-400 text-emerald-100" /> Health Pi Friend
             </h1>
             <p className="text-emerald-100 mb-8 opacity-90 leading-relaxed">
               ดูแลสุขภาพผ่าน AI ผู้ช่วยส่วนตัวของคุณ เริ่มต้นง่ายๆ เพียงไม่กี่ขั้นตอน
@@ -166,7 +166,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
           </div>
 
           <div className="relative z-10 text-xs text-emerald-200 text-center">
-            © 2024 NutriFriend AI
+            © 2024 Health Pi Friend
           </div>
         </div>
 

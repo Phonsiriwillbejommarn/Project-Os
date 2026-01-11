@@ -382,7 +382,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
                         <Brain className="w-5 h-5 mr-2 text-indigo-500" />
-                        🤖 AI Health Insights
+                        ✨ สรุปข้อมูลสุขภาพ
                     </h3>
 
                     <div className="space-y-3">
