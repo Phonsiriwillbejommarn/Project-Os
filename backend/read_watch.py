@@ -15,6 +15,18 @@ Script นี้จะ:
 import asyncio
 import sys
 import time
+import os
+
+# Force UTF-8 encoding for stdout/stderr
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except:
+    pass
+
+# Set environment variable for encoding
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 import requests
 from bleak import BleakScanner, BleakClient
 
