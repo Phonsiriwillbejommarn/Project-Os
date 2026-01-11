@@ -127,8 +127,16 @@ class AolonRealTimeService:
         
         print(f"🔗 Connecting to {addr}...")
         
+        # Cleanup existing client if any
+        if self.client:
+            try:
+                await self.client.disconnect()
+            except:
+                pass
+            self.client = None
+        
         try:
-            self.client = BleakClient(addr, timeout=15)
+            self.client = BleakClient(addr, timeout=20)
             await self.client.connect()
             self.connected = self.client.is_connected
             
@@ -214,8 +222,8 @@ class AolonRealTimeService:
                 if success:
                     print("✅ Auto-connect successful!")
                 else:
-                    print("⚠️ Auto-connect failed, retrying...")
-                    await asyncio.sleep(10)  # Wait before retry
+                    print("⚠️ Auto-connect failed, retrying in 20s...")
+                    await asyncio.sleep(20)  # Wait longer before retry to let BlueZ settle
                     continue
             
             # If connected, poll data
