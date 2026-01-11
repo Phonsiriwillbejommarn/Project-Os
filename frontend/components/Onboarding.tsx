@@ -344,10 +344,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                         onChange={(e) => handleChange('targetTimeline', e.target.value)}
                         className="w-full bg-white border border-gray-200 rounded-xl px-3 py-3 focus:ring-2 focus:ring-emerald-500 outline-none"
                       >
+                        <option value="1 Week">1 สัปดาห์</option>
+                        <option value="2 Weeks">2 สัปดาห์</option>
                         <option value="1 Month">1 เดือน</option>
                         <option value="3 Months">3 เดือน</option>
-                        <option value="6 Months">6 เดือน</option>
-                        <option value="1 Year">1 ปี</option>
                       </select>
                     </div>
                   </div>

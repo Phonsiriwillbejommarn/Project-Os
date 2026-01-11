@@ -308,6 +308,15 @@ const App: React.FC = () => {
             <MessageSquare className="w-6 h-6 md:mr-3" />
             <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">ผู้ช่วยส่วนตัว</span>
           </button>
+
+          {/* Profile Edit Button - Below Chat Tab */}
+          <button
+            onClick={() => setShowProfileEdit(true)}
+            className="hidden md:flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors text-gray-400 hover:text-emerald-500"
+          >
+            <User className="w-6 h-6 md:mr-3" />
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">แก้ไขข้อมูล</span>
+          </button>
         </div>
 
         <div className="hidden md:block p-6 mt-auto">
@@ -322,13 +331,6 @@ const App: React.FC = () => {
               <p>อย่าลืมดื่มน้ำให้เพียงพอ อย่างน้อยวันละ 8 แก้วนะครับ!</p>
             )}
           </div>
-          <button
-            onClick={() => setShowProfileEdit(true)}
-            className="w-full flex items-center text-left text-sm text-gray-600 hover:text-emerald-600 font-medium mb-2 p-2 rounded-lg hover:bg-gray-50"
-          >
-            <User className="w-4 h-4 mr-2" />
-            แก้ไขข้อมูลส่วนตัว
-          </button>
           <button
             onClick={handleLogout}
             className="w-full text-left text-sm text-red-500 hover:text-red-600 font-medium"
