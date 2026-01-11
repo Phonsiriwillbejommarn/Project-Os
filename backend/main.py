@@ -944,8 +944,54 @@ def update_user(user_id: int, user_update: UserProfileUpdate, db: Session = Depe
         raise HTTPException(status_code=404, detail="User not found")
 
     update_data = user_update.model_dump(exclude_unset=True)
+    
+    # Check if weight or goal changed - need to recalculate calories
+    weight_changed = 'weight' in update_data and update_data['weight'] != user.weight
+    goal_changed = 'goal' in update_data and update_data['goal'] != user.goal
+    
+    # Apply updates
     for key, value in update_data.items():
         setattr(user, key, value)
+    
+    # Recalculate calories/macros if weight or goal changed
+    if weight_changed or goal_changed:
+        try:
+            # Calculate BMR using Mifflin-St Jeor
+            if user.gender == "Male":
+                bmr = 10 * user.weight + 6.25 * user.height - 5 * user.age + 5
+            else:
+                bmr = 10 * user.weight + 6.25 * user.height - 5 * user.age - 161
+            
+            # Activity multiplier
+            activity_multipliers = {
+                "Sedentary": 1.2,
+                "LightlyActive": 1.375,
+                "ModeratelyActive": 1.55,
+                "VeryActive": 1.725,
+                "ExtraActive": 1.9
+            }
+            activity_str = str(user.activity_level)
+            multiplier = activity_multipliers.get(activity_str, 1.55)
+            tdee = bmr * multiplier
+            
+            # Adjust for goal
+            goal_str = str(user.goal)
+            if "Lose" in goal_str:
+                user.target_calories = round(tdee - 500)  # 500 cal deficit
+            elif "Gain" in goal_str:
+                user.target_calories = round(tdee + 300)  # 300 cal surplus
+            else:
+                user.target_calories = round(tdee)
+            
+            # Calculate macros (grams)
+            user.target_protein = round(user.weight * 1.6)  # 1.6g per kg
+            user.target_fat = round(user.target_calories * 0.25 / 9)
+            remaining_cals = user.target_calories - (user.target_protein * 4) - (user.target_fat * 9)
+            user.target_carbs = round(remaining_cals / 4)
+            
+            print(f"🔄 Recalculated for user {user_id}: {user.target_calories} kcal")
+        except Exception as e:
+            print(f"⚠️ Failed to recalculate: {e}")
 
     db.commit()
     db.refresh(user)
