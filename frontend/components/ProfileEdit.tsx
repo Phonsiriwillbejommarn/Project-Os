@@ -213,10 +213,10 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onSave, onClose }) => {
                             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
                         >
                             <option value="">-- เลือก --</option>
+                            <option value="1 week">1 สัปดาห์</option>
+                            <option value="2 weeks">2 สัปดาห์</option>
                             <option value="1 month">1 เดือน</option>
                             <option value="3 months">3 เดือน</option>
-                            <option value="6 months">6 เดือน</option>
-                            <option value="1 year">1 ปี</option>
                         </select>
                     </div>
 
