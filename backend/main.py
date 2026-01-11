@@ -153,6 +153,30 @@ def set_api_cooldown(model_name: str, duration: int = _API_COOLDOWN_DURATION):
     _api_stats["last_429_time"] = time.time()
     print(f"[COOLDOWN] Model {model_name} rate limited. Cooling down for {duration}s.")
 
+def parse_retry_delay(error_str: str) -> int:
+    """ดึงค่า retryDelay จาก API error response
+    ตัวอย่าง: 'retryDelay': '39s' หรือ 'Please retry in 39.658206176s'
+    """
+    import re
+    
+    # Pattern 1: retryDelay: '39s'
+    match = re.search(r"retryDelay['\"]?:\s*['\"]?(\d+)s", error_str)
+    if match:
+        return int(match.group(1)) + 5  # +5 buffer
+    
+    # Pattern 2: Please retry in 39.658206176s
+    match = re.search(r"retry in (\d+(?:\.\d+)?)s", error_str)
+    if match:
+        return int(float(match.group(1))) + 5  # +5 buffer
+    
+    # Pattern 3: 'retryDelay': '39s' from JSON
+    match = re.search(r"'retryDelay':\s*'(\d+)s'", error_str)
+    if match:
+        return int(match.group(1)) + 5
+    
+    # ถ้าหาไม่เจอ ใช้ค่าเริ่มต้น 5 นาที
+    return _API_COOLDOWN_DURATION
+
 def get_api_stats():
     """ดึงสถิติการใช้ API"""
     return {
@@ -225,7 +249,9 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
                 print(f"[WARN] Model {model_name} (Attempt {attempt}/{max_tries}) failed: {error_str}")
 
                 if "429" in error_str or "Resource has been exhausted" in error_str:
-                    set_api_cooldown(model_name, _API_COOLDOWN_DURATION)
+                    # ดึงค่า retryDelay จาก API response
+                    cooldown_duration = parse_retry_delay(error_str)
+                    set_api_cooldown(model_name, cooldown_duration)
                     break # Rate limit -> Next model
 
                 is_fatal = any(x in error_str for x in ["404", "400", "Not Found", "Invalid Argument"])
