@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 import os
 import json
@@ -13,6 +13,7 @@ import time
 import hashlib
 import sys
 import io
+import asyncio
 
 # Force UTF-8 encoding for stdout/stderr to prevent crashes on some terminals
 sys.stdout.reconfigure(encoding='utf-8')
@@ -32,13 +33,21 @@ from google.genai import types
 from google.genai.errors import ServerError
 from duckduckgo_search import DDGS
 
-from models import init_db, get_db, UserProfile, FoodItem, Message, MessageRole, NutritionPlan
+from models import (
+    init_db, get_db, UserProfile, FoodItem, Message, MessageRole, NutritionPlan,
+    HealthMetric, WorkoutSession, HealthAlert
+)
 from schemas import (
     UserProfileCreate, UserProfileResponse, UserProfileUpdate,
     FoodItemCreate, FoodItemResponse,
     MessageCreate, MessageResponse,
     DailyStats
 )
+
+# Health Coach Integration - Pi เป็นสมองหลัก
+from health_ai_engine import HealthAIEngine
+from health_coach import HealthCoachEngine
+from mqtt_handler import MQTTHealthHandler, AlertType, AlertPriority
 
 # ============================================================
 # Stronger Rate limit (per-endpoint) + cache + in-flight lock
@@ -236,13 +245,6 @@ def gemini_generate_with_backoff(model: str, contents, config: Optional[types.Ge
         raise HTTPException(status_code=503, detail=f"Forced model {force_model} failed: {last_error}")
 
     raise HTTPException(status_code=500, detail=f"AI Service Temporarily Unavailable. Last error: {last_error}")
-                break
-
-    # If we exit the loop, all models failed
-    import traceback
-    traceback.print_exc()
-    print(f"!!! ALL FALLBACK MODELS FAILED. Last error: {last_error}")
-    raise HTTPException(status_code=500, detail=f"AI Service Temporarily Unavailable. All models failed. Last error: {last_error}")
 
 
 # ============================================================
@@ -270,9 +272,137 @@ app.add_middleware(
 )
 
 
+# ============================================================
+# Health Coach Integration - Pi เป็นสมองหลัก
+# ============================================================
+
+# Initialize MQTT handler (mock mode for development)
+mqtt_handler = MQTTHealthHandler(broker="localhost", port=1883, mock_mode=True)
+
+# Initialize Health AI Engine (per-user instances will be created as needed)
+health_engines: Dict[int, HealthAIEngine] = {}
+
+# Initialize Health Coach
+health_coach = HealthCoachEngine(mqtt_handler=mqtt_handler, enable_mqtt=True)
+
+# Real Watch Service (imported separately for optional BLE connection)
+try:
+    from watch_service import AolonRealTimeService, get_watch_service
+    WATCH_SERVICE_AVAILABLE = True
+    print("✅ Watch service available")
+except ImportError:
+    WATCH_SERVICE_AVAILABLE = False
+    print("⚠️ Watch service not available")
+
+
+class WebSocketConnectionManager:
+    """จัดการ WebSocket connections สำหรับ real-time health data"""
+    
+    def __init__(self):
+        self.active_connections: Dict[int, WebSocket] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: int):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+        print(f"🔌 WebSocket connected: user {user_id}")
+    
+    def disconnect(self, user_id: int):
+        self.active_connections.pop(user_id, None)
+        print(f"🔌 WebSocket disconnected: user {user_id}")
+    
+    async def send_health_data(self, user_id: int, data: dict):
+        """ส่งข้อมูลสุขภาพแบบ real-time ไปยัง client"""
+        if user_id in self.active_connections:
+            try:
+                await self.active_connections[user_id].send_json(data)
+            except Exception as e:
+                print(f"Failed to send to user {user_id}: {e}")
+                self.disconnect(user_id)
+    
+    async def broadcast_alert(self, user_id: int, alert: dict):
+        """ส่ง alert ไปยัง user"""
+        await self.send_health_data(user_id, {"type": "alert", "data": alert})
+
+
+ws_manager = WebSocketConnectionManager()
+
+
+def get_health_engine(user_id: int, db: Session) -> HealthAIEngine:
+    """Get or create Health AI Engine for a user"""
+    if user_id not in health_engines:
+        # Load user info from DB
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if user:
+            engine = HealthAIEngine(user_age=user.age, user_weight=user.weight)
+            health_engines[user_id] = engine
+        else:
+            # Default engine
+            health_engines[user_id] = HealthAIEngine()
+    return health_engines[user_id]
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+# ============================================================
+# Real Watch API Endpoints (Aolon Curve)
+# ============================================================
+
+@app.get("/watch/status")
+async def get_watch_status():
+    """Get current watch connection status and data"""
+    if not WATCH_SERVICE_AVAILABLE:
+        return {"available": False, "error": "Watch service not installed"}
+    
+    service = get_watch_service()
+    data = service.get_current_data()
+    
+    return {
+        "available": True,
+        "connected": service.connected,
+        "hr": data["hr"],
+        "steps": data["steps"],
+        "battery": data["battery"],
+        "last_update": data["last_update"]
+    }
+
+
+@app.post("/watch/connect")
+async def connect_watch(background_tasks: BackgroundTasks):
+    """Connect to Aolon watch (runs in background)"""
+    if not WATCH_SERVICE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Watch service not available")
+    
+    service = get_watch_service()
+    
+    if service.connected:
+        return {"status": "already_connected", "data": service.get_current_data()}
+    
+    # Run connection in background
+    async def do_connect():
+        await service.connect()
+    
+    background_tasks.add_task(asyncio.run, do_connect())
+    
+    return {"status": "connecting", "message": "Watch connection initiated"}
+
+
+@app.post("/watch/disconnect")
+async def disconnect_watch():
+    """Disconnect from watch"""
+    if not WATCH_SERVICE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Watch service not available")
+    
+    service = get_watch_service()
+    
+    async def do_disconnect():
+        await service.disconnect()
+    
+    asyncio.create_task(do_disconnect())
+    
+    return {"status": "disconnecting"}
 
 
 @app.get("/api-stats")
@@ -1304,6 +1434,259 @@ async def chat_with_ai(request: ChatRequest, req: Request, db: Session = Depends
         return ChatResponse(response=text)
     finally:
         inflight_release(key)
+
+
+# ============================================================
+# Health Coach WebSocket & API Endpoints
+# ============================================================
+
+@app.websocket("/ws/health/{user_id}")
+async def websocket_health_endpoint(websocket: WebSocket, user_id: int):
+    """
+    WebSocket endpoint สำหรับ real-time health data
+    
+    Client ส่ง data:
+    {
+        "hr": 75,           # Heart rate
+        "steps": 5432,      # Step count
+        "accel_x": 0.1,     # Accelerometer
+        "accel_y": 0.2,
+        "accel_z": 9.8,
+        "spo2": 98          # Optional: Blood oxygen
+    }
+    
+    Server ตอบกลับ:
+    {
+        "health_data": { ... processed data ... },
+        "decisions": [ ... AI decisions/alerts ... ]
+    }
+    """
+    db = next(get_db())
+    
+    try:
+        await ws_manager.connect(websocket, user_id)
+        
+        # Get or create health engine for this user
+        health_engine = get_health_engine(user_id, db)
+        
+        # Get user info for decisions
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if user:
+            health_coach.set_user_baseline(user_id, {
+                "resting_hr": 70,  # Could be personalized
+                "max_hr": 220 - user.age,
+                "vo2_max": None
+            })
+        
+        while True:
+            # Receive sensor data from watch/client
+            raw_data = await websocket.receive_json()
+            
+            # Process with AI Engine
+            processed = health_engine.process_realtime(
+                hr=raw_data.get("hr", 70),
+                steps=raw_data.get("steps", 0),
+                accel_x=raw_data.get("accel_x", 0),
+                accel_y=raw_data.get("accel_y", 0),
+                accel_z=raw_data.get("accel_z", 9.8),
+                spo2=raw_data.get("spo2")
+            )
+            
+            # Make decisions with Health Coach
+            decisions = health_coach.make_decisions(processed.to_dict(), user_id)
+            
+            # Save to database (every minute or when anomaly)
+            if processed.anomaly_detected or int(time.time()) % 60 == 0:
+                health_metric = HealthMetric(
+                    user_id=user_id,
+                    timestamp=processed.timestamp,
+                    date=time.strftime("%Y-%m-%d"),
+                    heart_rate=processed.heart_rate,
+                    steps=processed.steps,
+                    spo2=raw_data.get("spo2"),
+                    activity_type=processed.activity,
+                    calories_burned=processed.calories_burned,
+                    hrv_sdnn=processed.hrv.get("sdnn") if processed.hrv else None,
+                    hrv_rmssd=processed.hrv.get("rmssd") if processed.hrv else None,
+                    stress_index=processed.hrv.get("stress_index") if processed.hrv else None,
+                    fatigue_score=processed.fatigue_score,
+                    vo2_max=processed.vo2_max,
+                    health_risk_level=processed.health_risk_level
+                )
+                db.add(health_metric)
+                db.commit()
+            
+            # Save alerts to database
+            for decision in decisions:
+                if decision.action.value == "ALERT":
+                    alert = HealthAlert(
+                        user_id=user_id,
+                        timestamp=decision.timestamp,
+                        date=time.strftime("%Y-%m-%d"),
+                        alert_type=decision.action.value,
+                        priority=decision.priority,
+                        message=decision.message,
+                        message_en=decision.message_en,
+                        data=json.dumps(decision.data) if decision.data else None
+                    )
+                    db.add(alert)
+                    db.commit()
+            
+            # Send response back to client
+            response = {
+                "health_data": processed.to_dict(),
+                "decisions": [d.to_dict() for d in decisions]
+            }
+            await websocket.send_json(response)
+            
+    except WebSocketDisconnect:
+        ws_manager.disconnect(user_id)
+    except Exception as e:
+        print(f"WebSocket error for user {user_id}: {e}")
+        ws_manager.disconnect(user_id)
+    finally:
+        db.close()
+
+
+@app.get("/users/{user_id}/health/today")
+def get_today_health(user_id: int, db: Session = Depends(get_db)):
+    """ดึงข้อมูลสุขภาพวันนี้"""
+    today = time.strftime("%Y-%m-%d")
+    
+    metrics = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == today
+    ).order_by(HealthMetric.timestamp.desc()).limit(100).all()
+    
+    if not metrics:
+        return {"date": today, "metrics": [], "summary": None}
+    
+    # Calculate summary
+    heart_rates = [m.heart_rate for m in metrics if m.heart_rate]
+    steps_list = [m.steps for m in metrics if m.steps]
+    calories_list = [m.calories_burned for m in metrics if m.calories_burned]
+    
+    summary = {
+        "avg_heart_rate": round(sum(heart_rates) / len(heart_rates)) if heart_rates else None,
+        "max_heart_rate": max(heart_rates) if heart_rates else None,
+        "min_heart_rate": min(heart_rates) if heart_rates else None,
+        "total_steps": max(steps_list) if steps_list else 0,
+        "total_calories": round(sum(calories_list), 1) if calories_list else 0,
+        "last_activity": metrics[0].activity_type if metrics else None,
+        "last_update": metrics[0].timestamp if metrics else None
+    }
+    
+    return {
+        "date": today,
+        "metrics": [
+            {
+                "timestamp": m.timestamp,
+                "heart_rate": m.heart_rate,
+                "steps": m.steps,
+                "activity_type": m.activity_type,
+                "stress_index": m.stress_index,
+                "fatigue_score": m.fatigue_score
+            }
+            for m in metrics[:20]  # Limit to last 20 for response size
+        ],
+        "summary": summary
+    }
+
+
+@app.get("/users/{user_id}/health/alerts")
+def get_health_alerts(user_id: int, unread_only: bool = True, db: Session = Depends(get_db)):
+    """ดึง health alerts"""
+    query = db.query(HealthAlert).filter(HealthAlert.user_id == user_id)
+    
+    if unread_only:
+        query = query.filter(HealthAlert.acknowledged == 0)
+    
+    alerts = query.order_by(HealthAlert.timestamp.desc()).limit(20).all()
+    
+    return {
+        "alerts": [
+            {
+                "id": a.id,
+                "timestamp": a.timestamp,
+                "alert_type": a.alert_type,
+                "priority": a.priority,
+                "message": a.message,
+                "acknowledged": a.acknowledged == 1
+            }
+            for a in alerts
+        ]
+    }
+
+
+@app.put("/users/{user_id}/health/alerts/{alert_id}/acknowledge")
+def acknowledge_alert(user_id: int, alert_id: int, db: Session = Depends(get_db)):
+    """Mark alert as acknowledged"""
+    alert = db.query(HealthAlert).filter(
+        HealthAlert.id == alert_id,
+        HealthAlert.user_id == user_id
+    ).first()
+    
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    alert.acknowledged = 1
+    alert.acknowledged_at = int(time.time())
+    db.commit()
+    
+    return {"status": "acknowledged", "alert_id": alert_id}
+
+
+@app.get("/users/{user_id}/health/workouts")
+def get_workout_sessions(user_id: int, limit: int = 10, db: Session = Depends(get_db)):
+    """ดึง workout sessions"""
+    sessions = db.query(WorkoutSession).filter(
+        WorkoutSession.user_id == user_id
+    ).order_by(WorkoutSession.start_time.desc()).limit(limit).all()
+    
+    return {
+        "workouts": [
+            {
+                "id": s.id,
+                "date": s.date,
+                "activity_type": s.activity_type,
+                "duration_minutes": s.duration_minutes,
+                "avg_heart_rate": s.avg_heart_rate,
+                "calories_burned": s.calories_burned,
+                "vo2_max": s.vo2_max
+            }
+            for s in sessions
+        ]
+    }
+
+
+@app.get("/users/{user_id}/health/stats")
+def get_health_stats(user_id: int, db: Session = Depends(get_db)):
+    """ดึงสถิติสุขภาพรวม"""
+    # Get engine stats
+    engine_stats = {}
+    if user_id in health_engines:
+        engine_stats = health_engines[user_id].get_stats()
+    
+    # Get today's metrics count
+    today = time.strftime("%Y-%m-%d")
+    today_count = db.query(HealthMetric).filter(
+        HealthMetric.user_id == user_id,
+        HealthMetric.date == today
+    ).count()
+    
+    # Get unread alerts count
+    unread_alerts = db.query(HealthAlert).filter(
+        HealthAlert.user_id == user_id,
+        HealthAlert.acknowledged == 0
+    ).count()
+    
+    return {
+        "user_id": user_id,
+        "today_metrics_count": today_count,
+        "unread_alerts": unread_alerts,
+        "engine_stats": engine_stats,
+        "connection_status": "connected" if user_id in ws_manager.active_connections else "disconnected"
+    }
 
 # ============================================================
 # Serve Frontend (Static Files) - MUST BE LAST

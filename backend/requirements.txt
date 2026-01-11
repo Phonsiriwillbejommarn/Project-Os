@@ -1,8 +1,15 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-sqlalchemy==2.0.23
-pydantic==2.5.2
-python-multipart==0.0.6
-python-dotenv==1.0.0
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+python-multipart
+python-dotenv
 google-genai
 duckduckgo-search
+# Health Coach Integration
+bleak
+paho-mqtt
+numpy
+scipy
+scikit-learn
+websockets

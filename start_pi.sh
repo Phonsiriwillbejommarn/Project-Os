@@ -38,6 +38,10 @@ else
     source .venv/bin/activate
 fi
 
+# Install dependencies (including health coach)
+echo "📦 Installing dependencies..."
+pip install -q -r requirements.txt
+
 
 # 3. Network & Server
 echo "[3/3] 🟢 Starting Services..."
