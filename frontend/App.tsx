@@ -27,6 +27,16 @@ const App: React.FC = () => {
   // Date State for History
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+  // Health Data State (from watch)
+  const [healthData, setHealthData] = useState<{
+    heart_rate: number;
+    steps: number;
+    calories_burned: number;
+    activity: string;
+    battery: number;
+    health_risk_level: string;
+  } | null>(null);
+
   // --- Effects ---
   useEffect(() => {
     const checkAuth = async () => {
@@ -76,6 +86,34 @@ const App: React.FC = () => {
     };
 
     checkAuth();
+  }, []);
+
+  // Fetch health data from watch (every 5 seconds)
+  useEffect(() => {
+    const fetchHealthData = async () => {
+      try {
+        const res = await fetch('/watch/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.connected && (data.steps > 0 || data.battery > 0)) {
+            setHealthData({
+              heart_rate: data.hr || 0,
+              steps: data.steps || 0,
+              calories_burned: (data.steps || 0) * 0.04,
+              activity: data.hr < 80 ? 'resting' : data.hr < 100 ? 'walking' : 'light_exercise',
+              battery: data.battery || 0,
+              health_risk_level: data.hr > 150 ? 'MODERATE' : 'LOW'
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore errors - watch may not be connected
+      }
+    };
+
+    fetchHealthData();
+    const interval = setInterval(fetchHealthData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // --- Handlers ---
@@ -304,6 +342,7 @@ const App: React.FC = () => {
               userProfile={userProfile}
               foodLogs={currentLogs}
               selectedDate={selectedDate}
+              healthData={healthData || undefined}
             />
           </div>
         )}

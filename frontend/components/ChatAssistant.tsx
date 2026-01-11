@@ -7,11 +7,19 @@ interface ChatAssistantProps {
   userProfile: UserProfile;
   foodLogs: FoodItem[];
   selectedDate: string;
+  healthData?: {
+    heart_rate: number;
+    steps: number;
+    calories_burned: number;
+    activity: string;
+    battery: number;
+    health_risk_level: string;
+  };
 }
 
 const API_BASE = "";
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, selectedDate }) => {
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, selectedDate, healthData }) => {
   const userId = userProfile.id;
 
   const INITIAL_MESSAGE: Message = {
@@ -170,7 +178,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
       // ✅ 1) บันทึกข้อความ user ลง DB
       await saveMessageToDB(userMsg);
 
-      // ✅ 2) คุยกับ AI
+      // ✅ 2) คุยกับ AI พร้อมข้อมูลสุขภาพ
       const res = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -179,6 +187,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ userProfile, foodLogs, se
           image: userMsg.image,
           profile: userProfile,
           foodLogs,
+          healthData: healthData || null,
         }),
       });
 
