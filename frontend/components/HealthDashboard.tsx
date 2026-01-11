@@ -20,6 +20,27 @@ interface WatchStatus {
     last_update: number;
 }
 
+interface DailyHealthData {
+    date: string;
+    day_name: string;
+    avg_heart_rate: number;
+    max_heart_rate: number;
+    steps: number;
+    calories_burned: number;
+}
+
+interface HealthHistory {
+    period_start: string;
+    period_end: string;
+    daily_data: DailyHealthData[];
+    summary: {
+        total_steps: number;
+        avg_daily_steps: number;
+        avg_heart_rate: number;
+        total_calories_burned: number;
+    };
+}
+
 const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onStepGoalChange }) => {
     // State
     const [connected, setConnected] = useState(false);
@@ -32,6 +53,8 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
     const [connecting, setConnecting] = useState(false);
     const [editingStepGoal, setEditingStepGoal] = useState(false);
     const [tempStepGoal, setTempStepGoal] = useState(stepGoal);
+    const [healthHistory, setHealthHistory] = useState<HealthHistory | null>(null);
+    const [chartType, setChartType] = useState<'steps' | 'hr' | 'calories'>('steps');
 
     // Refs
     const wsRef = useRef<WebSocket | null>(null);
@@ -76,6 +99,24 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
             console.error('Failed to fetch watch status:', error);
         }
     }, []);
+
+    // Fetch 7-day health history
+    const fetchHealthHistory = useCallback(async () => {
+        try {
+            const res = await fetch(`/users/${userId}/health/history?days=7`);
+            if (res.ok) {
+                const data = await res.json();
+                setHealthHistory(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch health history:', error);
+        }
+    }, [userId]);
+
+    // Fetch health history on mount
+    useEffect(() => {
+        fetchHealthHistory();
+    }, [fetchHealthHistory]);
 
     // Connect to watch
     const connectWatch = async () => {
@@ -464,6 +505,85 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 7-Day Health History Chart */}
+            {healthHistory && healthHistory.daily_data.length > 0 && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-700 flex items-center">
+                            <TrendingUp className="w-5 h-5 mr-2 text-blue-500" />
+                            สรุปสุขภาพ 7 วัน
+                        </h3>
+                        <div className="flex gap-1">
+                            {(['steps', 'hr', 'calories'] as const).map((type) => (
+                                <button
+                                    key={type}
+                                    onClick={() => setChartType(type)}
+                                    className={`px-3 py-1 text-xs rounded-full transition-all ${chartType === type
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {type === 'steps' ? 'ก้าว' : type === 'hr' ? 'HR' : 'แคลอรี่'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-4 gap-2 mb-4">
+                        <div className="bg-blue-50 p-2 rounded-lg text-center">
+                            <div className="text-xs text-blue-600">รวมก้าว</div>
+                            <div className="text-sm font-bold text-blue-700">{healthHistory.summary.total_steps.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-green-50 p-2 rounded-lg text-center">
+                            <div className="text-xs text-green-600">เฉลี่ย/วัน</div>
+                            <div className="text-sm font-bold text-green-700">{healthHistory.summary.avg_daily_steps.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-red-50 p-2 rounded-lg text-center">
+                            <div className="text-xs text-red-600">HR เฉลี่ย</div>
+                            <div className="text-sm font-bold text-red-700">{healthHistory.summary.avg_heart_rate} BPM</div>
+                        </div>
+                        <div className="bg-orange-50 p-2 rounded-lg text-center">
+                            <div className="text-xs text-orange-600">แคลอรี่</div>
+                            <div className="text-sm font-bold text-orange-700">{healthHistory.summary.total_calories_burned.toLocaleString()}</div>
+                        </div>
+                    </div>
+
+                    {/* Bar Chart */}
+                    <div className="h-40 flex items-end justify-between gap-1">
+                        {healthHistory.daily_data.map((day, index) => {
+                            const value = chartType === 'steps' ? day.steps
+                                : chartType === 'hr' ? day.avg_heart_rate
+                                    : day.calories_burned;
+                            const maxValue = Math.max(...healthHistory.daily_data.map(d =>
+                                chartType === 'steps' ? d.steps
+                                    : chartType === 'hr' ? d.avg_heart_rate
+                                        : d.calories_burned
+                            )) || 1;
+                            const height = (value / maxValue) * 100;
+                            const colors = chartType === 'steps'
+                                ? 'from-blue-400 to-blue-600'
+                                : chartType === 'hr'
+                                    ? 'from-red-400 to-red-600'
+                                    : 'from-orange-400 to-orange-600';
+
+                            return (
+                                <div key={index} className="flex-1 flex flex-col items-center">
+                                    <div className="text-xs text-gray-500 mb-1">
+                                        {value > 0 ? (chartType === 'hr' ? value : value.toLocaleString()) : '-'}
+                                    </div>
+                                    <div
+                                        className={`w-full rounded-t-lg bg-gradient-to-t ${colors} transition-all duration-500`}
+                                        style={{ height: `${Math.max(height, 5)}%`, minHeight: '4px' }}
+                                    />
+                                    <div className="text-xs text-gray-400 mt-1">{day.day_name}</div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}

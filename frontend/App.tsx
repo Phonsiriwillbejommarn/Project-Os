@@ -159,7 +159,7 @@ const App: React.FC = () => {
       }
     }
 
-    setCurrentTab('dashboard');
+    setCurrentTab('overview');
   };
 
   const handleLogout = () => {

@@ -1978,6 +1978,59 @@ def get_workout_sessions(user_id: int, limit: int = 10, db: Session = Depends(ge
     }
 
 
+@app.get("/users/{user_id}/health/history")
+def get_health_history(user_id: int, days: int = 7, db: Session = Depends(get_db)):
+    """ดึงประวัติสุขภาพ 7 วันย้อนหลังสำหรับแสดงกราฟ"""
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days-1)
+    
+    # Get daily aggregated health data
+    daily_data = []
+    for i in range(days):
+        day = start_date + timedelta(days=i)
+        day_str = day.isoformat()
+        
+        # Get metrics for this day
+        metrics = db.query(HealthMetric).filter(
+            HealthMetric.user_id == user_id,
+            HealthMetric.date == day_str
+        ).all()
+        
+        if metrics:
+            avg_hr = sum(m.heart_rate or 0 for m in metrics) / len([m for m in metrics if m.heart_rate])
+            max_hr = max((m.heart_rate or 0) for m in metrics)
+            total_steps = max((m.steps or 0) for m in metrics)  # Use max since steps accumulate
+            total_calories = sum(m.calories_burned or 0 for m in metrics)
+        else:
+            avg_hr = 0
+            max_hr = 0
+            total_steps = 0
+            total_calories = 0
+        
+        daily_data.append({
+            "date": day_str,
+            "day_name": day.strftime("%a"),
+            "avg_heart_rate": round(avg_hr, 0) if avg_hr else 0,
+            "max_heart_rate": max_hr,
+            "steps": total_steps,
+            "calories_burned": round(total_calories, 0)
+        })
+    
+    return {
+        "period_start": start_date.isoformat(),
+        "period_end": end_date.isoformat(),
+        "daily_data": daily_data,
+        "summary": {
+            "total_steps": sum(d["steps"] for d in daily_data),
+            "avg_daily_steps": round(sum(d["steps"] for d in daily_data) / days, 0),
+            "avg_heart_rate": round(sum(d["avg_heart_rate"] for d in daily_data) / len([d for d in daily_data if d["avg_heart_rate"] > 0]) if any(d["avg_heart_rate"] > 0 for d in daily_data) else 0, 0),
+            "total_calories_burned": sum(d["calories_burned"] for d in daily_data)
+        }
+    }
+
 @app.get("/users/{user_id}/health/stats")
 def get_health_stats(user_id: int, db: Session = Depends(get_db)):
     """ดึงสถิติสุขภาพรวม"""
