@@ -122,7 +122,10 @@ Pi → SQLite: บันทึกข้อมูลทุก 60 วินาท�
 1.  Choonewza. (2018). *การติดตั้งและตั้งค่าระบบ Raspberry Pi 3 Model B+*. สืบค้นเมื่อ 6 มกราคม 2569, จาก https://choonewza.medium.com/%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%95%E0%B8%B4%E0%B8%94%E0%B8%95%E0%B8%B1%E0%B9%89%E0%B8%87%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%95%E0%B8%B1%E0%B9%89%E0%B8%87%E0%B8%84%E0%B9%88%E0%B8%B2%E0%B8%A3%E0%B8%B0%E0%B8%9A%E0%B8%9A-raspberry-pi-3-model-b-fadd88dbfac0
 2.  วสันต์ ลิ่วลมไพศาล. (2022). *SQLite ฐานข้อมูลขนาดเล็กที่ศักยภาพมากกว่าที่คิด*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.mfec.co.th/tech-talk/sqlite-%E0%B8%90%E0%B8%B2%E0%B8%99%E0%B8%82%E0%B9%89%E0%B8%AD%E0%B8%A1%E0%B8%B9%E0%B8%A5%E0%B8%82%E0%B8%99%E0%B8%B2%E0%B8%94%E0%B9%80%E0%B8%A5%E0%B9%87%E0%B8%81%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%A8/
 3.  Rina Diane Caballar IBM. (2024). *Google Gemini คืออะไร?*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.ibm.com/think/topics/google-gemini
-4.  
+4.  bleak. (2023). *Bluetooth Bleak*. สืบข้อเมื่อ 11 มกราคม 2569, จาก IwY2xjawPQ3pRleHRuA2FlbQIxMQBzcnRjBmFwcF9pZA80Mzc2MjYzMTY5NzM3ODgAAR5vI6b5OV7qTaXPNaf118SVYivUUVl3_qh03FqIRykqxu5JH
+5.  Manuals+. (2021). *คู่มือการใช้งานสมาร์ทวอทช์ Aolon GT5 Pro Aolon GT5 Pro*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://manuals.plus/th/aolon/gt5-pro-smart-watch-manual-3?fbclid=IwY2xjawPQ339leHRuA2FlbQIxMQBzcnRjBmFwcF9pZA80Mzc2MjYzMTY5NzM3ODgAAR5SRep6wqDjl1Onidi2iChu9mFoP_eq2GDpXX-8_W0-oO9EQ_j9MrsBkSxQTg_aem__PWsW4uxNkkARtdkAE23OA
+6.  Medscape. (2020). *Medscape*. สืบค้นเมื่อ 12 มกราคม 2569, จาก https://www.medscape.com/?_gl=1*1hkyi35*_gcl_au*NjcxNjYxNzg1LjE3NjgxNTk3Njk.
+
 
 
 
