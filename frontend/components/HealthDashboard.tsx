@@ -270,28 +270,16 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                         </span>
                     )}
                 </div>
-                <div className="flex gap-2">
-                    {mode === 'watch' && !connected && (
-                        <button
-                            onClick={connectWatch}
-                            disabled={connecting}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50"
-                        >
-                            <Watch size={16} />
-                            {connecting ? 'Connecting...' : 'Connect Watch'}
-                        </button>
-                    )}
+                {mode === 'watch' && !connected && (
                     <button
-                        onClick={() => setMode(mode === 'mock' ? 'watch' : 'mock')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${mode === 'mock'
-                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                            }`}
+                        onClick={connectWatch}
+                        disabled={connecting}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50"
                     >
-                        {mode === 'mock' ? <WifiOff size={16} /> : <Watch size={16} />}
-                        {mode === 'mock' ? 'Mock Mode' : 'Watch Mode'}
+                        <Watch size={16} />
+                        {connecting ? 'Connecting...' : 'Connect Watch'}
                     </button>
-                </div>
+                )}
             </div>
 
             {/* Main Health Stats Grid */}
@@ -332,20 +320,20 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                     <div className="text-xs text-gray-500 mt-1">เผาผลาญ</div>
                 </div>
 
-                {/* Activity */}
+                {/* Fatigue Score */}
                 <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-5 rounded-2xl shadow-sm border border-emerald-100">
                     <div className="flex items-center justify-between mb-2">
-                        <Activity className="w-6 h-6 text-emerald-500" />
-                        <span className="text-xs text-emerald-400">Activity</span>
+                        <Zap className="w-6 h-6 text-yellow-500" />
+                        <span className="text-xs text-emerald-400">Fatigue</span>
                     </div>
-                    <div className="text-xl font-bold text-emerald-600 capitalize">
-                        {healthData?.activity?.replace('_', ' ') || '--'}
+                    <div className="text-3xl font-bold text-emerald-600">
+                        {((healthData?.fatigue_score || 0) * 100).toFixed(0)}%
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">กิจกรรมปัจจุบัน</div>
+                    <div className="text-xs text-gray-500 mt-1">ความเหนื่อยล้า</div>
                 </div>
             </div>
 
-            {/* HR Zone & HRV Analysis */}
+            {/* HR Zone & AI Insights */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* HR Zone */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -374,8 +362,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                                 {[1, 2, 3, 4, 5].map((zone) => (
                                     <div
                                         key={zone}
-                                        className={`flex-1 rounded transition-all ${zone <= healthData.hr_zone.zone ? 'opacity-100' : 'opacity-30'
-                                            }`}
+                                        className={`flex-1 rounded transition-all ${zone <= healthData.hr_zone.zone ? 'opacity-100' : 'opacity-30'}`}
                                         style={{ backgroundColor: getZoneColor(zone) }}
                                     />
                                 ))}
@@ -436,81 +423,6 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                                     ? '🎉 ถึงเป้าหมายแล้ว!'
                                     : `อีก ${(10000 - (healthData?.steps || 0)).toLocaleString()} ก้าว`}
                             </div>
-                        </div>
-
-                        {/* Health Status */}
-                        <div className={`p-3 rounded-xl ${healthData?.health_risk_level === 'LOW'
-                            ? 'bg-gradient-to-r from-green-50 to-emerald-50'
-                            : 'bg-gradient-to-r from-amber-50 to-orange-50'
-                            }`}>
-                            <div className="flex items-center gap-2">
-                                <span className={`text-lg ${healthData?.health_risk_level === 'LOW' ? 'text-green-600' : 'text-amber-600'
-                                    }`}>
-                                    {healthData?.health_risk_level === 'LOW' ? '✅' : '⚠️'}
-                                </span>
-                                <div>
-                                    <div className="text-sm font-medium text-gray-700">
-                                        {healthData?.health_risk_level === 'LOW'
-                                            ? 'สุขภาพดี! ค่าทุกอย่างปกติ'
-                                            : 'ควรระวัง - ติดตามค่า HR'}
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                        วิเคราะห์โดย AI บน Raspberry Pi
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Fatigue & Health Risk */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Fatigue Score */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-gray-500">Fatigue Score</span>
-                        <Zap className="w-5 h-5 text-yellow-500" />
-                    </div>
-                    <div className="relative h-24 flex items-center justify-center">
-                        <svg className="w-24 h-24 transform -rotate-90">
-                            <circle
-                                cx="48" cy="48" r="40"
-                                stroke="#e5e7eb" strokeWidth="8" fill="none"
-                            />
-                            <circle
-                                cx="48" cy="48" r="40"
-                                stroke={healthData?.fatigue_score && healthData.fatigue_score > 0.7 ? '#ef4444' : '#22c55e'}
-                                strokeWidth="8" fill="none"
-                                strokeDasharray={`${(healthData?.fatigue_score || 0) * 251.2} 251.2`}
-                                className="transition-all duration-500"
-                            />
-                        </svg>
-                        <div className="absolute text-xl font-bold text-gray-700">
-                            {((healthData?.fatigue_score || 0) * 100).toFixed(0)}%
-                        </div>
-                    </div>
-                    <div className="text-xs text-gray-400 text-center mt-2">
-                        คำนวณจาก Heart Rate
-                    </div>
-                </div>
-
-                {/* Health Risk */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-gray-500">Health Risk Level</span>
-                        <AlertTriangle className="w-5 h-5" style={{ color: getRiskColor(healthData?.health_risk_level || 'LOW') }} />
-                    </div>
-                    <div className="text-center py-4">
-                        <div
-                            className="text-3xl font-bold uppercase"
-                            style={{ color: getRiskColor(healthData?.health_risk_level || 'LOW') }}
-                        >
-                            {healthData?.health_risk_level || 'LOW'}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">ระดับความเสี่ยง</div>
-                        <div className="text-xs text-gray-300 mt-2">
-                            วิเคราะห์จาก HR, Steps, Activity
                         </div>
                     </div>
                 </div>

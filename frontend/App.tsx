@@ -251,15 +251,7 @@ const App: React.FC = () => {
             className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'dashboard' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
           >
             <LayoutDashboard className="w-6 h-6 md:mr-3" />
-            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">ภาพรวม</span>
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('chat')}
-            className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'chat' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
-          >
-            <MessageSquare className="w-6 h-6 md:mr-3" />
-            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">AI Chat</span>
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">โภชนาการ</span>
           </button>
 
           <button
@@ -268,6 +260,14 @@ const App: React.FC = () => {
           >
             <Heart className="w-6 h-6 md:mr-3" />
             <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">สุขภาพ</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('chat')}
+            className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'chat' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
+          >
+            <MessageSquare className="w-6 h-6 md:mr-3" />
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">ผู้ช่วยส่วนตัว</span>
           </button>
         </div>
 
@@ -299,7 +299,7 @@ const App: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">
-              {currentTab === 'dashboard' ? 'Dashboard สุขภาพ' : currentTab === 'health' ? 'Health Coach' : 'ห้องแชทโภชนาการ'}
+              {currentTab === 'dashboard' ? 'โภชนาการวันนี้' : currentTab === 'health' ? 'สุขภาพของคุณ' : 'ผู้ช่วยส่วนตัว'}
             </h2>
             <p className="text-gray-500 text-sm hidden sm:block">ดูแลสุขภาพของคุณในทุกๆ วัน</p>
           </div>
