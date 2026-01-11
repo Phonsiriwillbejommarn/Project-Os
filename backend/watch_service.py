@@ -111,16 +111,18 @@ class AolonRealTimeService:
     
     async def connect(self) -> bool:
         """Connect to Aolon watch"""
-        # Find watch if address not set
+        # Use stored address or default
         addr = self.address
-        if not addr or addr == AOLON_ADDRESS:
+        
+        # Only scan if we absolutely don't have an address
+        if not addr:
             found = await self.find_watch()
             if found:
                 addr = found
                 self.address = found
         
         if not addr:
-            print("❌ Watch not found")
+            print("❌ Watch not found (no address)")
             return False
         
         print(f"🔗 Connecting to {addr}...")
