@@ -25,7 +25,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
     const [decisions, setDecisions] = useState<HealthDecision[]>([]);
     const [alerts, setAlerts] = useState<HealthAlertType[]>([]);
     const [summary, setSummary] = useState<HealthSummary | null>(null);
-    const [mode, setMode] = useState<'mock' | 'watch'>('mock');
+    const [mode, setMode] = useState<'mock' | 'watch'>('watch');
     const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null);
     const [connecting, setConnecting] = useState(false);
 
