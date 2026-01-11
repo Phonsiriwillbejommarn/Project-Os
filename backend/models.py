@@ -53,6 +53,7 @@ class UserProfile(Base):
     target_protein = Column(Float, nullable=True)
     target_carbs = Column(Float, nullable=True)
     target_fat = Column(Float, nullable=True)
+    step_goal = Column(Integer, default=10000)  # เป้าหมายก้าวเดินต่อวัน
     daily_tips = Column(Text, default="[]")  # JSON string
 
 

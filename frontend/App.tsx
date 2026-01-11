@@ -138,6 +138,7 @@ const App: React.FC = () => {
       targetProtein: (user as any).target_protein || user.targetProtein,
       targetCarbs: (user as any).target_carbs || user.targetCarbs,
       targetFat: (user as any).target_fat || user.targetFat,
+      stepGoal: (user as any).step_goal || user.stepGoal || 10000,
       dailyTips: (user as any).daily_tips ? JSON.parse((user as any).daily_tips) : []
     };
 
@@ -354,7 +355,24 @@ const App: React.FC = () => {
             navigateToChat={() => setCurrentTab('chat')}
           />
         ) : currentTab === 'health' ? (
-          <HealthDashboard userId={userProfile.id!} />
+          <HealthDashboard
+            userId={userProfile.id!}
+            stepGoal={userProfile.stepGoal || 10000}
+            onStepGoalChange={async (newGoal) => {
+              // Update local state
+              setUserProfile({ ...userProfile, stepGoal: newGoal });
+              // Save to backend
+              try {
+                await fetch(`/users/${userProfile.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ step_goal: newGoal })
+                });
+              } catch (e) {
+                console.error('Failed to save step goal:', e);
+              }
+            }}
+          />
         ) : (
           <div className="h-full flex flex-col">
             <ChatAssistant

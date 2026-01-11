@@ -26,6 +26,7 @@ class UserProfileResponse(UserProfileCreate):
     target_protein: Optional[float] = None
     target_carbs: Optional[float] = None
     target_fat: Optional[float] = None
+    step_goal: Optional[int] = 10000
     daily_tips: Optional[str] = None
 
     class Config:
@@ -47,6 +48,7 @@ class UserProfileUpdate(BaseModel):
     target_protein: Optional[float] = None
     target_carbs: Optional[float] = None
     target_fat: Optional[float] = None
+    step_goal: Optional[int] = None
     daily_tips: Optional[str] = None
 
 

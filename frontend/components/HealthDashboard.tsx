@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HealthData, HealthDecision, HealthSummary, HealthAlert as HealthAlertType } from '../types';
 import {
     Heart, Activity, Flame, TrendingUp, AlertTriangle, Zap,
-    Brain, Footprints, Bell, CheckCircle, XCircle, Wifi, WifiOff, Watch, Battery
+    Brain, Footprints, Bell, CheckCircle, XCircle, Wifi, WifiOff, Watch, Battery, Settings, Save
 } from 'lucide-react';
 
 interface HealthDashboardProps {
     userId: number;
+    stepGoal: number;
+    onStepGoalChange: (newGoal: number) => void;
 }
 
 interface WatchStatus {
@@ -18,7 +20,7 @@ interface WatchStatus {
     last_update: number;
 }
 
-const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
+const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onStepGoalChange }) => {
     // State
     const [connected, setConnected] = useState(false);
     const [healthData, setHealthData] = useState<HealthData | null>(null);
@@ -28,6 +30,8 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
     const [mode, setMode] = useState<'mock' | 'watch'>('watch');
     const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null);
     const [connecting, setConnecting] = useState(false);
+    const [editingStepGoal, setEditingStepGoal] = useState(false);
+    const [tempStepGoal, setTempStepGoal] = useState(stepGoal);
 
     // Refs
     const wsRef = useRef<WebSocket | null>(null);
@@ -409,13 +413,13 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs text-gray-500">เป้าหมาย Steps วันนี้</span>
                                 <span className="text-sm font-medium text-blue-700">
-                                    {healthData?.steps?.toLocaleString() || 0} / 10,000
+                                    {healthData?.steps?.toLocaleString() || 0} / {stepGoal.toLocaleString()}
                                 </span>
                             </div>
                             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div
                                     className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
-                                    style={{ width: `${Math.min(100, ((healthData?.steps || 0) / 10000) * 100)}%` }}
+                                    style={{ width: `${Math.min(100, ((healthData?.steps || 0) / stepGoal) * 100)}%` }}
                                 />
                             </div>
                             <div className="text-xs text-gray-400 mt-1">
@@ -463,6 +467,54 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                     </div>
                 </div>
             )}
+
+            {/* Step Goal Settings */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                    <Settings className="w-5 h-5 mr-2 text-gray-500" />
+                    ตั้งค่าเป้าหมาย
+                </h3>
+
+                <div className="flex items-center justify-between">
+                    <div>
+                        <label className="text-sm text-gray-600">เป้าหมายก้าวเดินต่อวัน</label>
+                        <p className="text-xs text-gray-400">แนะนำ: 8,000 - 12,000 ก้าว</p>
+                    </div>
+
+                    {editingStepGoal ? (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                value={tempStepGoal}
+                                onChange={(e) => setTempStepGoal(parseInt(e.target.value) || 0)}
+                                className="w-24 px-3 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500"
+                                min={1000}
+                                max={50000}
+                                step={1000}
+                            />
+                            <button
+                                onClick={() => {
+                                    onStepGoalChange(tempStepGoal);
+                                    setEditingStepGoal(false);
+                                }}
+                                className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                            >
+                                <Save className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                setTempStepGoal(stepGoal);
+                                setEditingStepGoal(true);
+                            }}
+                            className="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 hover:bg-gray-200 font-medium"
+                        >
+                            {stepGoal.toLocaleString()} ก้าว
+                        </button>
+                    )}
+                </div>
+            </div>
 
             {/* Processing Info */}
             <div className="text-center text-xs text-gray-400">
