@@ -622,17 +622,16 @@ async def generate_overview_summary(data: dict):
 
 เขียนสรุปแบบบรรยาย 2-3 ประโยค รวมข้อมูลโภชนาการและสุขภาพเข้าด้วยกัน พูดถึงผู้ใช้โดยตรง (เช่น "วันนี้คุณ...") จบด้วยคำแนะนำหรือกำลังใจสั้นๆ ห้ามใช้ bullet points, หัวข้อ, หรือ emoji"""
 
-        # Try to use Gemini
-        if client:
-            try:
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash",
-                    contents=prompt
-                )
-                if response and response.text:
-                    return {"summary": response.text.strip()}
-            except Exception as e:
-                print(f"Gemini error: {e}")
+        # Try to use Gemini with fallback chain
+        try:
+            summary_text = gemini_generate_with_backoff(
+                model="gemini-2.0-flash",
+                contents=prompt
+            )
+            if summary_text:
+                return {"summary": summary_text}
+        except Exception as e:
+            print(f"Gemini summary error: {e}")
         
         # Fallback to local summary
         nutrition_status = ""
