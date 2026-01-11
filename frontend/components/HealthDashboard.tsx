@@ -319,59 +319,81 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                     )}
                 </div>
 
-                {/* HRV Analysis */}
+                {/* AI Health Insights */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                     <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
                         <Brain className="w-5 h-5 mr-2 text-indigo-500" />
-                        HRV Analysis (Pi Computed)
+                        🤖 AI Health Insights
                     </h3>
 
-                    {healthData?.hrv ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-slate-50 p-3 rounded-xl">
-                                <div className="text-xs text-gray-500 mb-1">SDNN</div>
-                                <div className="text-xl font-semibold text-slate-700">
-                                    {healthData.hrv.sdnn.toFixed(1)} <span className="text-xs text-gray-400">ms</span>
-                                </div>
+                    <div className="space-y-3">
+                        {/* Activity Analysis */}
+                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-xl">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-gray-500">กิจกรรมที่ AI วิเคราะห์</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                                    {healthData?.heart_rate && healthData.heart_rate > 0 ? 'Real-time' : 'รอข้อมูล'}
+                                </span>
                             </div>
-                            <div className="bg-slate-50 p-3 rounded-xl">
-                                <div className="text-xs text-gray-500 mb-1">RMSSD</div>
-                                <div className="text-xl font-semibold text-slate-700">
-                                    {healthData.hrv.rmssd.toFixed(1)} <span className="text-xs text-gray-400">ms</span>
-                                </div>
+                            <div className="text-lg font-semibold text-indigo-700 capitalize">
+                                {healthData?.activity?.replace('_', ' ') || 'รอข้อมูล HR'}
                             </div>
-                            <div className="col-span-2 bg-gradient-to-r from-green-50 to-red-50 p-3 rounded-xl">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs text-gray-500">Stress Index</span>
-                                    <span className="text-sm font-medium" style={{
-                                        color: healthData.hrv.stress_index > 70 ? '#ef4444' :
-                                            healthData.hrv.stress_index > 50 ? '#eab308' : '#22c55e'
-                                    }}>
-                                        {healthData.hrv.stress_index.toFixed(0)}/100
-                                    </span>
-                                </div>
-                                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full transition-all"
-                                        style={{
-                                            width: `${healthData.hrv.stress_index}%`,
-                                            background: `linear-gradient(to right, #22c55e, #eab308, #ef4444)`
-                                        }}
-                                    />
+                            <div className="text-xs text-gray-400 mt-1">
+                                {healthData?.heart_rate && healthData.heart_rate > 0
+                                    ? `วิเคราะห์จาก HR ${healthData.heart_rate} BPM`
+                                    : 'เปิดหน้าจอ HR บนนาฬิกาเพื่อดูข้อมูล'}
+                            </div>
+                        </div>
+
+                        {/* Step Goal Progress */}
+                        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-3 rounded-xl">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-gray-500">เป้าหมาย Steps วันนี้</span>
+                                <span className="text-sm font-medium text-blue-700">
+                                    {healthData?.steps?.toLocaleString() || 0} / 10,000
+                                </span>
+                            </div>
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
+                                    style={{ width: `${Math.min(100, ((healthData?.steps || 0) / 10000) * 100)}%` }}
+                                />
+                            </div>
+                            <div className="text-xs text-gray-400 mt-1">
+                                {healthData?.steps && healthData.steps >= 10000
+                                    ? '🎉 ถึงเป้าหมายแล้ว!'
+                                    : `อีก ${(10000 - (healthData?.steps || 0)).toLocaleString()} ก้าว`}
+                            </div>
+                        </div>
+
+                        {/* Health Status */}
+                        <div className={`p-3 rounded-xl ${healthData?.health_risk_level === 'LOW'
+                            ? 'bg-gradient-to-r from-green-50 to-emerald-50'
+                            : 'bg-gradient-to-r from-amber-50 to-orange-50'
+                            }`}>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-lg ${healthData?.health_risk_level === 'LOW' ? 'text-green-600' : 'text-amber-600'
+                                    }`}>
+                                    {healthData?.health_risk_level === 'LOW' ? '✅' : '⚠️'}
+                                </span>
+                                <div>
+                                    <div className="text-sm font-medium text-gray-700">
+                                        {healthData?.health_risk_level === 'LOW'
+                                            ? 'สุขภาพดี! ค่าทุกอย่างปกติ'
+                                            : 'ควรระวัง - ติดตามค่า HR'}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        วิเคราะห์โดย AI บน Raspberry Pi
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    ) : (
-                        <div className="text-gray-400 text-center py-6">
-                            <div className="text-sm mb-1">⚠️ นาฬิการุ่นนี้ไม่รองรับ HRV</div>
-                            <div className="text-xs">ต้องใช้นาฬิกาที่มี PPG sensor ขั้นสูง</div>
-                        </div>
-                    )}
+                    </div>
                 </div>
             </div>
 
-            {/* Fatigue & VO2 Max */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Fatigue & Health Risk */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Fatigue Score */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex items-center justify-between mb-3">
@@ -396,36 +418,28 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                             {((healthData?.fatigue_score || 0) * 100).toFixed(0)}%
                         </div>
                     </div>
-                </div>
-
-                {/* VO2 Max */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-gray-500">VO2 Max</span>
-                        <TrendingUp className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div className="text-center py-4">
-                        <div className="text-gray-400 text-sm">
-                            ⚠️ ไม่รองรับ
-                        </div>
-                        <div className="text-xs text-gray-300 mt-1">ต้องใช้ fitness watch</div>
+                    <div className="text-xs text-gray-400 text-center mt-2">
+                        คำนวณจาก Heart Rate
                     </div>
                 </div>
 
                 {/* Health Risk */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-gray-500">Health Risk</span>
+                        <span className="text-sm text-gray-500">Health Risk Level</span>
                         <AlertTriangle className="w-5 h-5" style={{ color: getRiskColor(healthData?.health_risk_level || 'LOW') }} />
                     </div>
                     <div className="text-center py-4">
                         <div
-                            className="text-2xl font-bold uppercase"
+                            className="text-3xl font-bold uppercase"
                             style={{ color: getRiskColor(healthData?.health_risk_level || 'LOW') }}
                         >
                             {healthData?.health_risk_level || 'LOW'}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">ระดับความเสี่ยง</div>
+                        <div className="text-xs text-gray-300 mt-2">
+                            วิเคราะห์จาก HR, Steps, Activity
+                        </div>
                     </div>
                 </div>
             </div>
