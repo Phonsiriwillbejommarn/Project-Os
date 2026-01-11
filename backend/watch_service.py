@@ -42,6 +42,10 @@ class AolonRealTimeService:
         # Callbacks
         self.on_data_callbacks = []
         
+        # Background polling task
+        self._polling_task = None
+        self._polling = False
+        
         logging.basicConfig(level=logging.INFO)
     
     def add_callback(self, callback: Callable[[Dict], Any]):
@@ -186,6 +190,56 @@ class AolonRealTimeService:
                 self.steps = self._parse_steps(steps_data)
             except:
                 pass
+    
+    async def update_battery(self):
+        """Update battery level"""
+        if self.connected and self.client:
+            try:
+                bat_data = await self.client.read_gatt_char(BATTERY_UUID)
+                self.battery = bat_data[0]
+            except:
+                pass
+    
+    async def _polling_loop(self, interval: float = 5.0):
+        """Background polling loop to update steps and battery"""
+        print(f"📡 Starting background polling (interval={interval}s)")
+        self._polling = True
+        
+        while self._polling and self.connected:
+            try:
+                # Update steps and battery
+                await self.update_steps()
+                await self.update_battery()
+                
+                # Check connection status
+                if self.client and not self.client.is_connected:
+                    print("⚠️ Connection lost during polling")
+                    self.connected = False
+                    break
+                
+                self.last_update = time.time()
+                print(f"📊 Data: HR={self.current_hr} Steps={self.steps} Battery={self.battery}%")
+                self._notify_callbacks()
+                
+            except Exception as e:
+                print(f"Polling error: {e}")
+            
+            await asyncio.sleep(interval)
+        
+        print("📡 Polling stopped")
+    
+    def start_polling(self, interval: float = 5.0):
+        """Start background polling task"""
+        if self._polling_task is None or self._polling_task.done():
+            self._polling_task = asyncio.create_task(self._polling_loop(interval))
+            print("✅ Background polling started")
+    
+    def stop_polling(self):
+        """Stop background polling task"""
+        self._polling = False
+        if self._polling_task and not self._polling_task.done():
+            self._polling_task.cancel()
+        print("🛑 Background polling stopped")
     
     async def run_forever(self, reconnect_interval: float = 5.0):
         """Run continuously with auto-reconnect"""

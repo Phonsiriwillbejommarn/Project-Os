@@ -369,6 +369,39 @@ async def get_watch_status():
     }
 
 
+class WatchDataInput(BaseModel):
+    """Input model for watch data from crontab script"""
+    hr: int = 0
+    steps: int = 0
+    battery: int = 0
+    timestamp: int = 0
+    connected: bool = False
+
+
+@app.post("/watch/data")
+async def receive_watch_data(data: WatchDataInput):
+    """Receive watch data from crontab script (read_watch.py)"""
+    if not WATCH_SERVICE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Watch service not available")
+    
+    service = get_watch_service()
+    
+    # Update service data from crontab script
+    if data.hr > 0:
+        service.current_hr = data.hr
+    if data.steps > 0:
+        service.steps = data.steps
+    if data.battery > 0:
+        service.battery = data.battery
+    
+    service.last_update = data.timestamp or time.time()
+    service.connected = data.connected
+    
+    print(f"📡 Crontab data received: HR={data.hr} Steps={data.steps} Battery={data.battery}%")
+    
+    return {"status": "ok", "message": "Data updated from crontab"}
+
+
 @app.post("/watch/connect")
 async def connect_watch(background_tasks: BackgroundTasks):
     """Connect to Aolon watch (runs in background)"""
@@ -380,11 +413,14 @@ async def connect_watch(background_tasks: BackgroundTasks):
     if service.connected:
         return {"status": "already_connected", "data": service.get_current_data()}
     
-    # Run connection in background
+    # Run connection in background and start polling when connected
     async def do_connect():
-        await service.connect()
+        success = await service.connect()
+        if success:
+            # Start background polling after successful connection
+            service.start_polling(interval=5.0)
     
-    background_tasks.add_task(asyncio.run, do_connect())
+    asyncio.create_task(do_connect())
     
     return {"status": "connecting", "message": "Watch connection initiated"}
 
@@ -396,6 +432,9 @@ async def disconnect_watch():
         raise HTTPException(status_code=503, detail="Watch service not available")
     
     service = get_watch_service()
+    
+    # Stop polling first
+    service.stop_polling()
     
     async def do_disconnect():
         await service.disconnect()
