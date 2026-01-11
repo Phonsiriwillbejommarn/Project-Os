@@ -200,12 +200,23 @@ class AolonRealTimeService:
             except:
                 pass
     
-    async def _polling_loop(self, interval: float = 5.0):
-        """Background polling loop to update steps and battery"""
-        print(f"📡 Starting background polling (interval={interval}s)")
+    async def _auto_connect_loop(self, interval: float = 5.0):
+        """Background loop to maintain connection"""
+        print(f"🔄 Starting auto-connect service (interval={interval}s)")
         self._polling = True
         
-        while self._polling and self.connected:
+        while self._polling:
+            if not self.connected:
+                print("🔍 Auto-connecting...")
+                success = await self.connect()
+                if success:
+                    print("✅ Auto-connect successful!")
+                else:
+                    print("⚠️ Auto-connect failed, retrying...")
+                    await asyncio.sleep(10)  # Wait before retry
+                    continue
+            
+            # If connected, poll data
             try:
                 # Update steps and battery
                 await self.update_steps()
@@ -215,31 +226,32 @@ class AolonRealTimeService:
                 if self.client and not self.client.is_connected:
                     print("⚠️ Connection lost during polling")
                     self.connected = False
-                    break
+                    continue
                 
                 self.last_update = time.time()
-                print(f"📊 Data: HR={self.current_hr} Steps={self.steps} Battery={self.battery}%")
+                # print(f"📊 Data: HR={self.current_hr} Steps={self.steps} Battery={self.battery}%")
                 self._notify_callbacks()
                 
             except Exception as e:
                 print(f"Polling error: {e}")
+                self.connected = False
             
             await asyncio.sleep(interval)
         
-        print("📡 Polling stopped")
-    
-    def start_polling(self, interval: float = 5.0):
-        """Start background polling task"""
+        print("🛑 Auto-connect service stopped")
+
+    def start_auto_connect(self, interval: float = 5.0):
+        """Start background auto-connect task"""
         if self._polling_task is None or self._polling_task.done():
-            self._polling_task = asyncio.create_task(self._polling_loop(interval))
-            print("✅ Background polling started")
+            self._polling_task = asyncio.create_task(self._auto_connect_loop(interval))
+            print("✅ Auto-connect task started")
     
-    def stop_polling(self):
-        """Stop background polling task"""
+    def stop_auto_connect(self):
+        """Stop background auto-connect task"""
         self._polling = False
         if self._polling_task and not self._polling_task.done():
             self._polling_task.cancel()
-        print("🛑 Background polling stopped")
+        print("🛑 Auto-connect task stopped")
     
     async def run_forever(self, reconnect_interval: float = 5.0):
         """Run continuously with auto-reconnect"""
