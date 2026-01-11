@@ -362,8 +362,9 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-gray-400 text-center py-8">
-                            รอข้อมูลเพิ่มเติม...
+                        <div className="text-gray-400 text-center py-6">
+                            <div className="text-sm mb-1">⚠️ นาฬิการุ่นนี้ไม่รองรับ HRV</div>
+                            <div className="text-xs">ต้องใช้นาฬิกาที่มี PPG sensor ขั้นสูง</div>
                         </div>
                     )}
                 </div>
@@ -400,14 +401,14 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                 {/* VO2 Max */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                     <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm text-gray-500">VO2 Max (Estimated)</span>
+                        <span className="text-sm text-gray-500">VO2 Max</span>
                         <TrendingUp className="w-5 h-5 text-blue-500" />
                     </div>
                     <div className="text-center py-4">
-                        <div className="text-4xl font-bold text-blue-600">
-                            {healthData?.vo2_max?.toFixed(1) || '--'}
+                        <div className="text-gray-400 text-sm">
+                            ⚠️ ไม่รองรับ
                         </div>
-                        <div className="text-xs text-gray-400 mt-1">ml/kg/min</div>
+                        <div className="text-xs text-gray-300 mt-1">ต้องใช้ fitness watch</div>
                     </div>
                 </div>
 
