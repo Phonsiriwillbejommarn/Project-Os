@@ -557,14 +557,15 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                                         {/* Bars */}
                                         <div className="absolute inset-0 flex items-end justify-around px-2">
                                             {healthHistory.daily_data.map((day, index) => {
-                                                const height = (day.steps / yMax) * 100;
+                                                const chartHeight = 200; // Chart height in pixels
+                                                const heightPx = (day.steps / yMax) * chartHeight;
                                                 const isOverGoal = day.steps >= stepGoal;
 
                                                 return (
                                                     <div key={index} className="flex flex-col items-center" style={{ width: '12%' }}>
                                                         <div
-                                                            className={`w-full rounded-t-lg transition-all ${isOverGoal ? 'bg-emerald-400' : 'bg-emerald-400'}`}
-                                                            style={{ height: `${Math.min(height, 100)}%`, minHeight: day.steps > 0 ? '4px' : '0' }}
+                                                            className={`w-full rounded-t-lg transition-all ${isOverGoal ? 'bg-red-400' : 'bg-emerald-400'}`}
+                                                            style={{ height: `${Math.max(heightPx, day.steps > 0 ? 4 : 0)}px` }}
                                                         />
                                                     </div>
                                                 );
