@@ -143,6 +143,7 @@ def is_api_on_cooldown(model_name: str) -> bool:
         remaining = int(cooldown_until - now)
         print(f"[COOLDOWN] Model {model_name} is on cooldown for {remaining}s more. Skipping to save resources.")
         _api_stats["saved_calls"] += 1
+        log_api_event("COOLDOWN_SKIP", model_name, remaining)
         return True
     return False
 
@@ -152,6 +153,27 @@ def set_api_cooldown(model_name: str, duration: int = _API_COOLDOWN_DURATION):
     _api_stats["rate_limited"] += 1
     _api_stats["last_429_time"] = time.time()
     print(f"[COOLDOWN] Model {model_name} rate limited. Cooling down for {duration}s.")
+    # บันทึกลง file
+    log_api_event("RATE_LIMITED", model_name, duration)
+
+def log_api_event(event_type: str, model_name: str, duration: int = 0):
+    """บันทึก API event ลง file สำหรับดูย้อนหลัง"""
+    try:
+        from datetime import datetime
+        log_file = "/home/os/api_analytics.log"
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        with open(log_file, "a", encoding="utf-8") as f:
+            if event_type == "RATE_LIMITED":
+                f.write(f"[{now}] 🚫 {event_type}: {model_name} → cooldown {duration}s\n")
+            elif event_type == "COOLDOWN_SKIP":
+                f.write(f"[{now}] ⏭️ {event_type}: {model_name} → saved call\n")
+            elif event_type == "SUCCESS":
+                f.write(f"[{now}] ✅ {event_type}: {model_name}\n")
+            else:
+                f.write(f"[{now}] {event_type}: {model_name}\n")
+    except Exception as e:
+        print(f"[LOG ERROR] Cannot write to log file: {e}")
 
 def parse_retry_delay(error_str: str) -> int:
     """ดึงค่า retryDelay จาก API error response
