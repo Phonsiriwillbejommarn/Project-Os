@@ -523,8 +523,8 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                                     key={type}
                                     onClick={() => setChartType(type)}
                                     className={`px-3 py-1 text-xs rounded-full transition-all ${chartType === type
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                         }`}
                                 >
                                     {type === 'steps' ? 'ก้าว' : type === 'hr' ? 'HR' : 'แคลอรี่'}
@@ -554,36 +554,52 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                     </div>
 
                     {/* Bar Chart */}
-                    <div className="h-40 flex items-end justify-between gap-1">
+                    <div className="h-48 flex items-end justify-between gap-2">
                         {healthHistory.daily_data.map((day, index) => {
                             const value = chartType === 'steps' ? day.steps
                                 : chartType === 'hr' ? day.avg_heart_rate
                                     : day.calories_burned;
+                            const target = chartType === 'steps' ? stepGoal : chartType === 'hr' ? 80 : 300;
                             const maxValue = Math.max(...healthHistory.daily_data.map(d =>
                                 chartType === 'steps' ? d.steps
                                     : chartType === 'hr' ? d.avg_heart_rate
                                         : d.calories_burned
-                            )) || 1;
-                            const height = (value / maxValue) * 100;
-                            const colors = chartType === 'steps'
-                                ? 'from-blue-400 to-blue-600'
-                                : chartType === 'hr'
-                                    ? 'from-red-400 to-red-600'
-                                    : 'from-orange-400 to-orange-600';
+                            ), target) || 1;
+                            const height = (value / (maxValue * 1.2)) * 100;
+                            const isOverTarget = value >= target;
+
+                            // Thai day names
+                            const thaiDays = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+                            const dayIndex = new Date(day.date).getDay();
+                            const thaiDay = thaiDays[dayIndex === 0 ? 6 : dayIndex - 1];
 
                             return (
                                 <div key={index} className="flex-1 flex flex-col items-center">
-                                    <div className="text-xs text-gray-500 mb-1">
-                                        {value > 0 ? (chartType === 'hr' ? value : value.toLocaleString()) : '-'}
-                                    </div>
                                     <div
-                                        className={`w-full rounded-t-lg bg-gradient-to-t ${colors} transition-all duration-500`}
-                                        style={{ height: `${Math.max(height, 5)}%`, minHeight: '4px' }}
+                                        className={`w-full rounded-t-lg transition-all duration-500 ${value === 0
+                                                ? 'bg-gray-200'
+                                                : isOverTarget
+                                                    ? 'bg-gradient-to-t from-red-400 to-red-500'
+                                                    : 'bg-gradient-to-t from-emerald-400 to-emerald-500'
+                                            }`}
+                                        style={{ height: `${Math.max(height, 3)}%`, minHeight: value > 0 ? '8px' : '4px' }}
                                     />
-                                    <div className="text-xs text-gray-400 mt-1">{day.day_name}</div>
+                                    <div className="text-xs text-gray-500 mt-2 font-medium">{thaiDay}</div>
                                 </div>
                             );
                         })}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="flex items-center justify-center gap-6 mt-4 text-sm">
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded bg-emerald-500"></div>
+                            <span className="text-gray-600">ตามเกณฑ์</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded bg-red-500"></div>
+                            <span className="text-gray-600">เกินเป้าหมาย</span>
+                        </div>
                     </div>
                 </div>
             )}
