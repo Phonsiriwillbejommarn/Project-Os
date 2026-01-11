@@ -60,7 +60,7 @@ def main():
                 "steps": steps,
                 "battery": battery,
                 "connected": True,
-                "timestamp": time.time()
+                "timestamp": int(time.time())
             }
             
             save_res = requests.post(f"{API_BASE}/watch/data", json=save_data, timeout=5)
