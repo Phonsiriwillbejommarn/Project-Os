@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, DailyStats, FoodItem } from '../types';
 import {
     Heart, Footprints, Flame, Target, Utensils, Zap,
-    TrendingUp, Activity, CheckCircle
+    TrendingUp, Activity, CheckCircle, Sparkles, RefreshCw
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -23,6 +23,9 @@ interface OverviewDashboardProps {
 const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     user, stats, healthData, navigateToNutrition, navigateToHealth
 }) => {
+    const [aiSummary, setAiSummary] = useState<string>('');
+    const [loadingSummary, setLoadingSummary] = useState(false);
+
     const targetCalories = user.targetCalories || 2000;
     const remainingCalories = targetCalories - stats.calories;
     const calPercentage = Math.min(100, (stats.calories / targetCalories) * 100);
@@ -30,6 +33,80 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     // Fatigue score calculation
     const fatigueScore = healthData?.fatigue_score ||
         (healthData?.heart_rate ? Math.min(1, (healthData.heart_rate - 60) / 100) : 0);
+
+    // Generate AI Summary
+    const generateSummary = async () => {
+        setLoadingSummary(true);
+        try {
+            const summaryData = {
+                nutrition: {
+                    calories_eaten: stats.calories,
+                    target_calories: targetCalories,
+                    remaining: remainingCalories,
+                    protein: stats.protein,
+                    carbs: stats.carbs,
+                    fat: stats.fat,
+                    percentage: Math.round(calPercentage)
+                },
+                health: {
+                    heart_rate: healthData?.heart_rate || 0,
+                    steps: healthData?.steps || 0,
+                    steps_goal: 10000,
+                    calories_burned: healthData?.calories_burned || 0,
+                    activity: healthData?.activity || 'unknown',
+                    fatigue: Math.round(fatigueScore * 100)
+                },
+                user: {
+                    name: user.name,
+                    goal: user.goal
+                }
+            };
+
+            const response = await fetch('/ai/overview-summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(summaryData)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setAiSummary(data.summary || 'ไม่สามารถสร้างสรุปได้');
+            } else {
+                // Generate local summary if API fails
+                generateLocalSummary();
+            }
+        } catch (error) {
+            console.error('Failed to generate AI summary:', error);
+            generateLocalSummary();
+        }
+        setLoadingSummary(false);
+    };
+
+    // Local fallback summary
+    const generateLocalSummary = () => {
+        const nutritionStatus = remainingCalories > 0
+            ? `คุณยังทานได้อีก ${remainingCalories} kcal`
+            : `คุณทานเกินไป ${Math.abs(remainingCalories)} kcal แล้ว`;
+
+        const stepsStatus = (healthData?.steps || 0) >= 10000
+            ? '🎉 คุณเดินครบ 10,000 ก้าวแล้ววันนี้!'
+            : `เดินอีก ${(10000 - (healthData?.steps || 0)).toLocaleString()} ก้าวจะถึงเป้า`;
+
+        const fatigueAdvice = fatigueScore > 0.7
+            ? '😓 ระดับความเหนื่อยล้าสูง ควรพักผ่อนให้เพียงพอ'
+            : fatigueScore > 0.4
+                ? '⚡ พลังงานปานกลาง ลองออกกำลังกายเบาๆ'
+                : '💪 สบายดี! พร้อมลุยกิจกรรมได้เลย';
+
+        setAiSummary(`📊 **สรุปวันนี้ของคุณ**\n\n🍽️ **โภชนาการ:** ${nutritionStatus}\n👟 **การเดิน:** ${stepsStatus}\n${fatigueAdvice}`);
+    };
+
+    // Auto-generate summary on mount and when data changes
+    useEffect(() => {
+        if (user.id && (stats.calories > 0 || healthData?.steps)) {
+            generateSummary();
+        }
+    }, [stats.calories, healthData?.steps, healthData?.heart_rate]);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -41,6 +118,39 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 <p className="text-gray-500 text-sm mt-1">
                     นี่คือสรุปภาพรวมสุขภาพและโภชนาการของคุณวันนี้
                 </p>
+            </div>
+
+            {/* AI Summary Card */}
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6 rounded-2xl shadow-sm border border-indigo-100">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-indigo-700 flex items-center">
+                        <Sparkles className="w-5 h-5 mr-2 text-indigo-500" />
+                        🤖 AI สรุปภาพรวมวันนี้
+                    </h3>
+                    <button
+                        onClick={generateSummary}
+                        disabled={loadingSummary}
+                        className="text-indigo-500 hover:text-indigo-700 p-2 rounded-full hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loadingSummary ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+
+                {loadingSummary ? (
+                    <div className="flex items-center justify-center py-4">
+                        <div className="animate-pulse text-gray-400">กำลังวิเคราะห์...</div>
+                    </div>
+                ) : aiSummary ? (
+                    <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                        {aiSummary.split('**').map((part, i) =>
+                            i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-sm text-gray-400 text-center py-4">
+                        ยังไม่มีข้อมูลเพียงพอสำหรับการสรุป
+                    </div>
+                )}
             </div>
 
             {/* Quick Stats Grid */}
@@ -223,3 +333,4 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 };
 
 export default OverviewDashboard;
+
