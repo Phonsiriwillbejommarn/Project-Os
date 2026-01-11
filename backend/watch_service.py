@@ -3,11 +3,14 @@ Real Aolon Watch Service - Background BLE Connection
 
 เชื่อมต่อ Aolon Curve และส่ง data แบบ real-time
 รองรับ: Heart Rate, Battery, Steps (vendor)
+Auto-save to database and log file
 """
 
 import asyncio
 import logging
 import time
+import os
+from datetime import datetime
 from typing import Callable, Optional, Dict, Any
 from bleak import BleakScanner, BleakClient
 
@@ -20,6 +23,22 @@ BATTERY_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
 
 # Vendor service (contains Steps)
 VENDOR_STEPS_UUID = "0000fee1-0000-1000-8000-00805f9b34fb"
+
+# Log file path
+LOG_FILE = "/home/os/health_data.log"
+
+
+def log_health_data(hr: int, steps: int, battery: int, connected: bool, saved: bool = False):
+    """Write health data to log file"""
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = "SAVE" if saved else "DATA"
+        log_line = f"[{now}] [{status}] HR={hr} Steps={steps} Battery={battery}% Connected={connected}\n"
+        
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_line)
+    except Exception as e:
+        print(f"⚠️ Log write failed: {e}")
 
 
 class AolonRealTimeService:
@@ -38,6 +57,10 @@ class AolonRealTimeService:
         self.battery = 0
         self.steps = 0
         self.last_update = 0
+        
+        # Database save tracking
+        self._last_save_time = 0
+        self._save_interval = 60  # Save every 60 seconds
         
         # Callbacks
         self.on_data_callbacks = []
@@ -239,8 +262,18 @@ class AolonRealTimeService:
                     continue
                 
                 self.last_update = time.time()
-                # print(f"📊 Data: HR={self.current_hr} Steps={self.steps} Battery={self.battery}%")
                 self._notify_callbacks()
+                
+                # Log every poll
+                log_health_data(self.current_hr, self.steps, self.battery, self.connected, saved=False)
+                
+                # Auto-save to database every _save_interval seconds
+                current_time = time.time()
+                if current_time - self._last_save_time >= self._save_interval:
+                    if self.current_hr > 0 or self.steps > 0:
+                        await self._save_to_database()
+                        self._last_save_time = current_time
+                        log_health_data(self.current_hr, self.steps, self.battery, self.connected, saved=True)
                 
             except Exception as e:
                 print(f"Polling error: {e}")
@@ -249,6 +282,59 @@ class AolonRealTimeService:
             await asyncio.sleep(interval)
         
         print("🛑 Auto-connect service stopped")
+    
+    async def _save_to_database(self):
+        """Save current health data to database"""
+        try:
+            from models import HealthMetric, SessionLocal
+            
+            now = datetime.now()
+            
+            # Calculate activity type from HR
+            if self.current_hr < 80:
+                activity = "resting"
+            elif self.current_hr < 100:
+                activity = "walking"
+            elif self.current_hr < 120:
+                activity = "light_exercise"
+            else:
+                activity = "moderate_exercise"
+            
+            # Calculate calories
+            calories = self.steps * 0.04 if self.steps > 0 else 0
+            
+            # Calculate fatigue score
+            fatigue = min(1.0, (self.current_hr - 60) / 100) if self.current_hr > 60 else 0
+            
+            # Calculate health risk
+            if self.current_hr > 150:
+                risk = "HIGH"
+            elif self.current_hr > 120:
+                risk = "MODERATE"
+            else:
+                risk = "LOW"
+            
+            db = SessionLocal()
+            try:
+                health_metric = HealthMetric(
+                    user_id=1,  # Default user
+                    timestamp=int(time.time()),
+                    date=now.strftime("%Y-%m-%d"),
+                    heart_rate=self.current_hr if self.current_hr > 0 else None,
+                    steps=self.steps,
+                    calories_burned=calories,
+                    activity_type=activity,
+                    fatigue_score=fatigue,
+                    health_risk_level=risk
+                )
+                db.add(health_metric)
+                db.commit()
+                print(f"💾 DB saved: HR={self.current_hr} Steps={self.steps} Activity={activity}")
+            finally:
+                db.close()
+                
+        except Exception as e:
+            print(f"⚠️ DB save failed: {e}")
 
     def start_auto_connect(self, interval: float = 5.0):
         """Start background auto-connect task"""
