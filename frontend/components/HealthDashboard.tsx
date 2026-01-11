@@ -128,7 +128,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
         });
     }, []);
 
-    // Mode effect
+    // WebSocket connection for real-time updates
     useEffect(() => {
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
@@ -138,14 +138,86 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
             generateMockData();
             intervalRef.current = setInterval(generateMockData, 2000);
         } else {
-            // Watch mode - fetch status every 2 seconds
-            fetchWatchStatus();
-            intervalRef.current = setInterval(fetchWatchStatus, 2000);
+            // Watch mode - use WebSocket for real-time updates
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/watch`;
+
+            console.log('🔌 Connecting to WebSocket:', wsUrl);
+
+            const ws = new WebSocket(wsUrl);
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                console.log('✅ WebSocket connected!');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'watch_update') {
+                        setWatchStatus({
+                            available: true,
+                            connected: data.connected,
+                            hr: data.hr,
+                            steps: data.steps,
+                            battery: data.battery,
+                            last_update: data.last_update
+                        });
+                        setConnected(data.connected);
+
+                        if (data.steps > 0 || data.battery > 0) {
+                            const watchHealth: HealthData = {
+                                timestamp: data.last_update || Date.now() / 1000,
+                                heart_rate: data.hr,
+                                steps: data.steps,
+                                activity: data.hr < 80 ? 'resting' : data.hr < 100 ? 'walking' : 'light_exercise',
+                                anomaly_detected: false,
+                                fatigue_score: data.hr > 0 ? Math.min(1, (data.hr - 60) / 100) : 0,
+                                calories_burned: data.steps * 0.04,
+                                hr_zone: {
+                                    zone: data.hr < 100 ? 1 : data.hr < 120 ? 2 : data.hr < 140 ? 3 : 4,
+                                    name: data.hr < 100 ? 'พักผ่อน' : data.hr < 120 ? 'เผาผลาญไขมัน' : data.hr < 140 ? 'คาร์ดิโอ' : 'Peak',
+                                    hr_percent: data.hr > 0 ? (data.hr / 190) * 100 : 0
+                                },
+                                health_risk_level: data.hr > 150 ? 'MODERATE' : 'LOW',
+                                processing_time_ms: 0
+                            };
+                            setHealthData(watchHealth);
+                            setSummary({
+                                avg_heart_rate: data.hr,
+                                total_steps: data.steps,
+                                total_calories: data.steps * 0.04
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('WebSocket parse error:', err);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                // Fallback to HTTP polling
+                fetchWatchStatus();
+                intervalRef.current = setInterval(fetchWatchStatus, 5000);
+            };
+
+            ws.onclose = () => {
+                console.log('🔌 WebSocket closed, falling back to HTTP polling');
+                // Fallback to HTTP polling if still in watch mode
+                fetchWatchStatus();
+                intervalRef.current = setInterval(fetchWatchStatus, 5000);
+            };
         }
 
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
+            }
+            if (wsRef.current) {
+                wsRef.current.close();
+                wsRef.current = null;
             }
         };
     }, [mode, generateMockData, fetchWatchStatus]);

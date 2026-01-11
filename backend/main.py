@@ -444,6 +444,90 @@ async def disconnect_watch():
     return {"status": "disconnecting"}
 
 
+# ============================================================
+# WebSocket for Real-time Watch Data
+# ============================================================
+
+class WatchWebSocketManager:
+    """จัดการ WebSocket connections สำหรับ watch data real-time"""
+    
+    def __init__(self):
+        self.connections: List[WebSocket] = []
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.append(websocket)
+        print(f"📡 Watch WebSocket connected. Total: {len(self.connections)}")
+    
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.connections:
+            self.connections.remove(websocket)
+        print(f"📡 Watch WebSocket disconnected. Total: {len(self.connections)}")
+    
+    async def broadcast(self, data: dict):
+        """Broadcast watch data to all connected clients"""
+        disconnected = []
+        for ws in self.connections:
+            try:
+                await ws.send_json(data)
+            except Exception:
+                disconnected.append(ws)
+        
+        for ws in disconnected:
+            self.disconnect(ws)
+
+
+watch_ws_manager = WatchWebSocketManager()
+
+
+@app.websocket("/ws/watch")
+async def websocket_watch_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint สำหรับ real-time watch data
+    Server จะ push updates ทุก 2 วินาที
+    """
+    await watch_ws_manager.connect(websocket)
+    
+    try:
+        while True:
+            # Get current watch data
+            if WATCH_SERVICE_AVAILABLE:
+                service = get_watch_service()
+                data = service.get_current_data()
+                
+                watch_data = {
+                    "type": "watch_update",
+                    "connected": service.connected,
+                    "hr": data["hr"],
+                    "steps": data["steps"],
+                    "battery": data["battery"],
+                    "last_update": data["last_update"],
+                    "timestamp": time.time()
+                }
+            else:
+                watch_data = {
+                    "type": "watch_update",
+                    "connected": False,
+                    "hr": 0,
+                    "steps": 0,
+                    "battery": 0,
+                    "last_update": 0,
+                    "timestamp": time.time()
+                }
+            
+            # Send to this client
+            await websocket.send_json(watch_data)
+            
+            # Wait 2 seconds before next update
+            await asyncio.sleep(2)
+            
+    except WebSocketDisconnect:
+        watch_ws_manager.disconnect(websocket)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        watch_ws_manager.disconnect(websocket)
+
+
 @app.get("/api-stats")
 async def api_statistics():
     """ดูสถิติการใช้ API และ cooldown status เพื่อประหยัด resources"""
