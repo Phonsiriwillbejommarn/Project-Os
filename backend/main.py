@@ -379,8 +379,8 @@ class WatchDataInput(BaseModel):
 
 
 @app.post("/watch/data")
-async def receive_watch_data(data: WatchDataInput):
-    """Receive watch data from crontab script (read_watch.py)"""
+async def receive_watch_data(data: WatchDataInput, db: Session = Depends(get_db)):
+    """Receive watch data from crontab script (read_watch.py) and save to database"""
     if not WATCH_SERVICE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Watch service not available")
     
@@ -397,9 +397,47 @@ async def receive_watch_data(data: WatchDataInput):
     service.last_update = data.timestamp or time.time()
     service.connected = data.connected
     
+    # Auto-save to database (HealthMetric)
+    if data.connected and (data.steps > 0 or data.hr > 0):
+        try:
+            from datetime import datetime
+            now = datetime.now()
+            
+            # Calculate activity type from HR
+            if data.hr < 80:
+                activity = "resting"
+            elif data.hr < 100:
+                activity = "walking"
+            elif data.hr < 120:
+                activity = "light_exercise"
+            else:
+                activity = "moderate_exercise"
+            
+            # Calculate calories
+            calories = data.steps * 0.04 if data.steps > 0 else 0
+            
+            # Calculate health risk
+            risk = "HIGH" if data.hr > 150 else ("MODERATE" if data.hr > 120 else "LOW")
+            
+            health_metric = HealthMetric(
+                user_id=1,  # Default user
+                timestamp=int(data.timestamp or time.time()),
+                date=now.strftime("%Y-%m-%d"),
+                heart_rate=data.hr if data.hr > 0 else None,
+                steps=data.steps,
+                calories_burned=calories,
+                activity_type=activity,
+                health_risk_level=risk
+            )
+            db.add(health_metric)
+            db.commit()
+            print(f"💾 Health log saved: HR={data.hr} Steps={data.steps}")
+        except Exception as e:
+            print(f"⚠️ Failed to save health log: {e}")
+    
     print(f"📡 Crontab data received: HR={data.hr} Steps={data.steps} Battery={data.battery}%")
     
-    return {"status": "ok", "message": "Data updated from crontab"}
+    return {"status": "ok", "message": "Data updated from crontab", "saved_to_db": True}
 
 
 @app.post("/watch/connect")
