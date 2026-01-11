@@ -82,23 +82,44 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         setLoadingSummary(false);
     };
 
-    // Local fallback summary
+    // Local fallback summary - narrative style
     const generateLocalSummary = () => {
-        const nutritionStatus = remainingCalories > 0
-            ? `คุณยังทานได้อีก ${remainingCalories} kcal`
-            : `คุณทานเกินไป ${Math.abs(remainingCalories)} kcal แล้ว`;
+        const name = user.name || 'คุณ';
+        const caloriesEaten = stats.calories;
+        const stepsToday = healthData?.steps || 0;
+        const hr = healthData?.heart_rate || 0;
 
-        const stepsStatus = (healthData?.steps || 0) >= 10000
-            ? '🎉 คุณเดินครบ 10,000 ก้าวแล้ววันนี้!'
-            : `เดินอีก ${(10000 - (healthData?.steps || 0)).toLocaleString()} ก้าวจะถึงเป้า`;
+        let narrative = `วันนี้${name}ทานอาหารไปแล้ว ${caloriesEaten.toLocaleString()} kcal `;
 
-        const fatigueAdvice = fatigueScore > 0.7
-            ? '😓 ระดับความเหนื่อยล้าสูง ควรพักผ่อนให้เพียงพอ'
-            : fatigueScore > 0.4
-                ? '⚡ พลังงานปานกลาง ลองออกกำลังกายเบาๆ'
-                : '💪 สบายดี! พร้อมลุยกิจกรรมได้เลย';
+        if (remainingCalories > 0) {
+            narrative += `ยังสามารถทานได้อีก ${remainingCalories.toLocaleString()} kcal โดยไม่เกินเป้าหมายครับ `;
+        } else {
+            narrative += `ซึ่งเกินเป้าหมายไป ${Math.abs(remainingCalories).toLocaleString()} kcal แล้ว ลองออกกำลังกายเพิ่มเพื่อเผาผลาญครับ `;
+        }
 
-        setAiSummary(`📊 **สรุปวันนี้ของคุณ**\n\n🍽️ **โภชนาการ:** ${nutritionStatus}\n👟 **การเดิน:** ${stepsStatus}\n${fatigueAdvice}`);
+        narrative += `ส่วนการเดินวันนี้อยู่ที่ ${stepsToday.toLocaleString()} ก้าว `;
+
+        if (stepsToday >= 10000) {
+            narrative += `ถึงเป้าหมายแล้ว ยอดเยี่ยมครับ! `;
+        } else if (stepsToday >= 5000) {
+            narrative += `เดินอีกสัก ${(10000 - stepsToday).toLocaleString()} ก้าวจะถึงเป้าหมายครับ `;
+        } else {
+            narrative += `ลองหาเวลาเดินเพิ่มเพื่อสุขภาพที่ดีครับ `;
+        }
+
+        if (hr > 0) {
+            narrative += `อัตราการเต้นหัวใจอยู่ที่ ${hr} BPM `;
+        }
+
+        if (fatigueScore > 0.7) {
+            narrative += `และดูเหมือนว่าร่างกายต้องการพักผ่อน อย่าลืมดื่มน้ำและพักผ่อนให้เพียงพอนะครับ`;
+        } else if (fatigueScore > 0.4) {
+            narrative += `พลังงานยังอยู่ในเกณฑ์ดี ลองออกกำลังกายเบาๆ เพื่อเพิ่มความสดชื่นครับ`;
+        } else {
+            narrative += `ร่างกายพร้อมลุย! ขอให้มีวันที่ดีครับ`;
+        }
+
+        setAiSummary(narrative);
     };
 
     // Auto-generate summary on mount and when data changes
@@ -119,40 +140,6 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     นี่คือสรุปภาพรวมสุขภาพและโภชนาการของคุณวันนี้
                 </p>
             </div>
-
-            {/* AI Summary Card */}
-            <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-6 rounded-2xl shadow-sm border border-emerald-100">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-emerald-700 flex items-center">
-                        <Sparkles className="w-5 h-5 mr-2 text-emerald-500" />
-                        ✨ สรุปสุขภาพวันนี้
-                    </h3>
-                    <button
-                        onClick={generateSummary}
-                        disabled={loadingSummary}
-                        className="text-indigo-500 hover:text-indigo-700 p-2 rounded-full hover:bg-indigo-100 transition-colors disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${loadingSummary ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
-
-                {loadingSummary ? (
-                    <div className="flex items-center justify-center py-4">
-                        <div className="animate-pulse text-gray-400">กำลังวิเคราะห์...</div>
-                    </div>
-                ) : aiSummary ? (
-                    <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                        {aiSummary.split('**').map((part, i) =>
-                            i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-                        )}
-                    </div>
-                ) : (
-                    <div className="text-sm text-gray-400 text-center py-4">
-                        ยังไม่มีข้อมูลเพียงพอสำหรับการสรุป
-                    </div>
-                )}
-            </div>
-
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Calories Today */}
@@ -327,6 +314,37 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             : '⚠️ ยังไม่ได้เชื่อมต่อนาฬิกา'}
                     </span>
                 </div>
+            </div>
+
+            {/* AI Summary Card - Narrative Style */}
+            <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-6 rounded-2xl shadow-sm border border-emerald-100">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-emerald-700 flex items-center">
+                        <Sparkles className="w-5 h-5 mr-2 text-emerald-500" />
+                        ✨ สรุปสุขภาพวันนี้
+                    </h3>
+                    <button
+                        onClick={generateSummary}
+                        disabled={loadingSummary}
+                        className="text-emerald-500 hover:text-emerald-700 p-2 rounded-full hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loadingSummary ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+
+                {loadingSummary ? (
+                    <div className="flex items-center justify-center py-4">
+                        <div className="animate-pulse text-gray-400">กำลังวิเคราะห์...</div>
+                    </div>
+                ) : aiSummary ? (
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                        {aiSummary}
+                    </p>
+                ) : (
+                    <div className="text-sm text-gray-400 text-center py-4">
+                        ยังไม่มีข้อมูลเพียงพอสำหรับการสรุป
+                    </div>
+                )}
             </div>
         </div>
     );
