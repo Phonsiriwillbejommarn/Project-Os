@@ -261,6 +261,15 @@ app = FastAPI(title="SmartFood Analyzer API", version="1.0.0")
 @app.on_event("startup")
 def startup():
     init_db()
+    
+    # Start Watch Service Auto-connect
+    if WATCH_SERVICE_AVAILABLE:
+        try:
+            service = get_watch_service()
+            service.start_auto_connect(interval=5.0)
+            print("✅ Watch service auto-connect started on boot")
+        except Exception as e:
+            print(f"⚠️ Failed to start watch service: {e}")
 
 # Configure CORS
 app.add_middleware(
@@ -451,16 +460,10 @@ async def connect_watch(background_tasks: BackgroundTasks):
     if service.connected:
         return {"status": "already_connected", "data": service.get_current_data()}
     
-    # Run connection in background and start polling when connected
-    async def do_connect():
-        success = await service.connect()
-        if success:
-            # Start background polling after successful connection
-            service.start_polling(interval=5.0)
+    # Start auto-connect service
+    service.start_auto_connect(interval=5.0)
     
-    asyncio.create_task(do_connect())
-    
-    return {"status": "connecting", "message": "Watch connection initiated"}
+    return {"status": "connecting", "message": "Watch auto-connect service started"}
 
 
 @app.post("/watch/disconnect")
@@ -471,15 +474,15 @@ async def disconnect_watch():
     
     service = get_watch_service()
     
-    # Stop polling first
-    service.stop_polling()
+    # Stop auto-connect service
+    service.stop_auto_connect()
     
     async def do_disconnect():
         await service.disconnect()
     
     asyncio.create_task(do_disconnect())
     
-    return {"status": "disconnecting"}
+    return {"status": "disconnecting", "message": "Watch disconnecting..."}
 
 
 # ============================================================
