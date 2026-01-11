@@ -6,7 +6,6 @@ import Dashboard from './components/Dashboard';
 import ChatAssistant from './components/ChatAssistant';
 import HealthDashboard from './components/HealthDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
-import ProfileEdit from './components/ProfileEdit';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -16,9 +15,7 @@ import {
   ChevronRight,
   Lightbulb,
   Heart,
-  Home,
-  Settings,
-  User
+  Home
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -308,15 +305,6 @@ const App: React.FC = () => {
             <MessageSquare className="w-6 h-6 md:mr-3" />
             <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">ผู้ช่วยส่วนตัว</span>
           </button>
-
-          {/* Profile Edit Button - Below Chat Tab */}
-          <button
-            onClick={() => setShowProfileEdit(true)}
-            className="hidden md:flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors text-gray-400 hover:text-emerald-500"
-          >
-            <User className="w-6 h-6 md:mr-3" />
-            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">แก้ไขข้อมูล</span>
-          </button>
         </div>
 
         <div className="hidden md:block p-6 mt-auto">
@@ -421,15 +409,6 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
-
-      {/* Profile Edit Modal */}
-      {showProfileEdit && userProfile && (
-        <ProfileEdit
-          user={userProfile}
-          onSave={handleProfileSave}
-          onClose={() => setShowProfileEdit(false)}
-        />
-      )}
     </div>
   );
 };
