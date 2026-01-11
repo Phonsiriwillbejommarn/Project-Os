@@ -509,64 +509,112 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                 </div>
             )}
 
-            {/* Walking Statistics */}
+            {/* Walking Statistics - Bar Chart */}
             {healthHistory && (
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                        <Footprints className="w-5 h-5 mr-2 text-blue-500" />
-                        สถิติการเดิน 7 วัน
-                    </h3>
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-emerald-600 flex items-center">
+                            📅 สรุป 7 วันย้อนหลัง
+                        </h3>
+                        <span className="text-sm text-emerald-500 font-medium">
+                            เฉลี่ย {healthHistory.summary.avg_daily_steps.toLocaleString()} ก้าว/วัน
+                        </span>
+                    </div>
+
+                    {/* Bar Chart */}
+                    <div className="relative">
+                        {/* Y-Axis Labels */}
+                        {(() => {
+                            const maxSteps = Math.max(...healthHistory.daily_data.map(d => d.steps), stepGoal);
+                            const yMax = Math.ceil(maxSteps / 2500) * 2500;
+                            const yLabels = [yMax, yMax * 0.75, yMax * 0.5, yMax * 0.25, 0];
+
+                            return (
+                                <div className="flex">
+                                    {/* Y Axis */}
+                                    <div className="w-12 flex flex-col justify-between text-right pr-2 text-xs text-gray-400" style={{ height: '200px' }}>
+                                        {yLabels.map((val, i) => (
+                                            <span key={i}>{val.toLocaleString()}</span>
+                                        ))}
+                                    </div>
+
+                                    {/* Chart Area */}
+                                    <div className="flex-1 relative" style={{ height: '200px' }}>
+                                        {/* Grid Lines */}
+                                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                                            {[0, 1, 2, 3, 4].map(i => (
+                                                <div key={i} className="border-t border-gray-100 w-full" />
+                                            ))}
+                                        </div>
+
+                                        {/* Target Line */}
+                                        <div
+                                            className="absolute w-full border-t-2 border-dashed border-gray-300 z-10"
+                                            style={{ bottom: `${(stepGoal / yMax) * 100}%` }}
+                                        />
+
+                                        {/* Bars */}
+                                        <div className="absolute inset-0 flex items-end justify-around px-2">
+                                            {healthHistory.daily_data.map((day, index) => {
+                                                const height = (day.steps / yMax) * 100;
+                                                const isOverGoal = day.steps >= stepGoal;
+
+                                                return (
+                                                    <div key={index} className="flex flex-col items-center" style={{ width: '12%' }}>
+                                                        <div
+                                                            className={`w-full rounded-t-lg transition-all ${isOverGoal ? 'bg-emerald-400' : 'bg-emerald-400'}`}
+                                                            style={{ height: `${Math.min(height, 100)}%`, minHeight: day.steps > 0 ? '4px' : '0' }}
+                                                        />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* X-Axis Labels */}
+                        <div className="flex mt-2 pl-12">
+                            {healthHistory.daily_data.map((day, index) => {
+                                const thaiDaysShort = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+                                const dayOfWeek = new Date(day.date).getDay();
+                                return (
+                                    <div key={index} className="flex-1 text-center text-xs text-gray-500">
+                                        {thaiDaysShort[dayOfWeek]}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="flex items-center justify-center gap-6 mt-4 text-xs">
+                        <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded bg-emerald-400" />
+                            <span className="text-gray-500">ก้าวเดิน</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-4 border-t-2 border-dashed border-gray-400" />
+                            <span className="text-gray-500">เป้าหมาย ({stepGoal.toLocaleString()})</span>
+                        </div>
+                    </div>
 
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-2 gap-4 mt-4">
                         <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl">
                             <div className="text-xs text-blue-600 mb-1">รวมก้าวเดิน</div>
                             <div className="text-2xl font-bold text-blue-700">
                                 {healthHistory.summary.total_steps.toLocaleString()}
                             </div>
-                            <div className="text-xs text-blue-500 mt-1">
-                                เฉลี่ย {healthHistory.summary.avg_daily_steps.toLocaleString()} ก้าว/วัน
-                            </div>
                         </div>
                         <div className="bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl">
                             <div className="text-xs text-orange-600 mb-1">เผาผลาญแคลอรี่</div>
                             <div className="text-2xl font-bold text-orange-700">
-                                {healthHistory.summary.total_calories_burned.toLocaleString()}
-                            </div>
-                            <div className="text-xs text-orange-500 mt-1">
-                                เฉลี่ย {Math.round(healthHistory.summary.total_calories_burned / 7)} kcal/วัน
+                                {healthHistory.summary.total_calories_burned.toLocaleString()} kcal
                             </div>
                         </div>
-                    </div>
-
-                    {/* Daily Breakdown */}
-                    <div className="space-y-2">
-                        <div className="text-sm font-medium text-gray-600 mb-2">รายละเอียดแต่ละวัน</div>
-                        {healthHistory.daily_data.slice().reverse().map((day, index) => {
-                            const thaiDays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์'];
-                            const dayOfWeek = new Date(day.date).getDay();
-                            const progress = (day.steps / stepGoal) * 100;
-
-                            return (
-                                <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                                    <div className="w-16 text-xs text-gray-600">{thaiDays[dayOfWeek]}</div>
-                                    <div className="flex-1">
-                                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all ${progress >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                                                style={{ width: `${Math.min(progress, 100)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="w-20 text-right text-xs font-medium text-gray-700">
-                                        {day.steps.toLocaleString()} ก้าว
-                                    </div>
-                                    <div className="w-16 text-right text-xs text-orange-600">
-                                        {day.calories_burned} kcal
-                                    </div>
-                                </div>
-                            );
-                        })}
                     </div>
                 </div>
             )}
