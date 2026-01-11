@@ -2000,7 +2000,8 @@ def get_health_history(user_id: int, days: int = 7, db: Session = Depends(get_db
         ).all()
         
         if metrics:
-            avg_hr = sum(m.heart_rate or 0 for m in metrics) / len([m for m in metrics if m.heart_rate])
+            hr_metrics = [m for m in metrics if m.heart_rate and m.heart_rate > 0]
+            avg_hr = sum(m.heart_rate for m in hr_metrics) / len(hr_metrics) if hr_metrics else 0
             max_hr = max((m.heart_rate or 0) for m in metrics)
             total_steps = max((m.steps or 0) for m in metrics)  # Use max since steps accumulate
             total_calories = sum(m.calories_burned or 0 for m in metrics)
