@@ -11,8 +11,8 @@ import time
 from typing import Callable, Optional, Dict, Any
 from bleak import BleakScanner, BleakClient
 
-# Aolon Curve Address
-AOLON_ADDRESS = "97D79E42-3F6D-A0E7-ABF3-35D244DD82D1"
+# Aolon Curve Address (Pi format)
+AOLON_ADDRESS = "E2:AD:F6:7A:56:55"
 
 # Standard GATT UUIDs
 HR_MEASUREMENT_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
