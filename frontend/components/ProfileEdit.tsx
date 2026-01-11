@@ -74,12 +74,10 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onSave, onClose }) => {
                 name: formData.name,
                 weight: formData.weight,
                 height: formData.height,
-                stepGoal: formData.step_goal,
-                ...({
-                    target_weight: formData.target_weight,
-                    target_timeline: formData.target_timeline
-                } as any)
-            });
+                step_goal: formData.step_goal,
+                target_weight: formData.target_weight,
+                target_timeline: formData.target_timeline
+            } as any);
             onClose();
         } catch (e) {
             console.error('Failed to save:', e);
