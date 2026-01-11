@@ -109,36 +109,6 @@ const ProfileEdit: React.FC<ProfileEditProps> = ({ user, onSave, onClose }) => {
                     </button>
                 </div>
 
-                {/* Goal Progress Card */}
-                {goalProgress?.available && (
-                    <div className="p-4 border-b bg-gradient-to-r from-emerald-50 to-blue-50">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700 flex items-center">
-                                {getGoalIcon()}
-                                <span className="ml-2">เป้าหมายระยะยาว</span>
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${goalProgress.on_track ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {goalProgress.on_track ? '✓ On Track' : '⚠ Behind'}
-                            </span>
-                        </div>
-                        {/* Progress Bar */}
-                        <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
-                            <div
-                                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all"
-                                style={{ width: `${goalProgress.progress_percent || 0}%` }}
-                            />
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-500">
-                            <span>{goalProgress.start_weight} kg</span>
-                            <span className="font-medium text-emerald-600">{goalProgress.progress_percent?.toFixed(1)}%</span>
-                            <span>{goalProgress.target_weight} kg</span>
-                        </div>
-                        <div className="mt-2 text-xs text-gray-500 text-center">
-                            สัปดาห์ที่ {goalProgress.weeks_elapsed} / {(goalProgress.weeks_elapsed || 0) + (goalProgress.weeks_remaining || 0)} ({goalProgress.timeline})
-                        </div>
-                    </div>
-                )}
-
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
                     {/* Name */}
