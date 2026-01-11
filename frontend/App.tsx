@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import ChatAssistant from './components/ChatAssistant';
 import HealthDashboard from './components/HealthDashboard';
 import OverviewDashboard from './components/OverviewDashboard';
+import ProfileEdit from './components/ProfileEdit';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -15,7 +16,9 @@ import {
   ChevronRight,
   Lightbulb,
   Heart,
-  Home
+  Home,
+  Settings,
+  User
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -25,6 +28,7 @@ const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'overview' | 'dashboard' | 'health' | 'chat'>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(true);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
 
   // Date State for History
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -194,6 +198,29 @@ const App: React.FC = () => {
     }
   };
 
+  const handleProfileSave = async (updatedData: Partial<UserProfile>) => {
+    if (!userProfile?.id) return;
+
+    try {
+      const response = await fetch(`/users/${userProfile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        setUserProfile({
+          ...userProfile,
+          ...updated,
+          stepGoal: updated.step_goal
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save profile", error);
+    }
+  };
+
   const handleRemoveFoodLog = async (id: string) => {
     if (!userProfile?.id) return;
 
@@ -296,6 +323,13 @@ const App: React.FC = () => {
             )}
           </div>
           <button
+            onClick={() => setShowProfileEdit(true)}
+            className="w-full flex items-center text-left text-sm text-gray-600 hover:text-emerald-600 font-medium mb-2 p-2 rounded-lg hover:bg-gray-50"
+          >
+            <User className="w-4 h-4 mr-2" />
+            แก้ไขข้อมูลส่วนตัว
+          </button>
+          <button
             onClick={handleLogout}
             className="w-full text-left text-sm text-red-500 hover:text-red-600 font-medium"
           >
@@ -385,6 +419,15 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Profile Edit Modal */}
+      {showProfileEdit && userProfile && (
+        <ProfileEdit
+          user={userProfile}
+          onSave={handleProfileSave}
+          onClose={() => setShowProfileEdit(false)}
+        />
+      )}
     </div>
   );
 };
