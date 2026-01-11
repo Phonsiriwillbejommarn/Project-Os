@@ -433,6 +433,7 @@ class WatchDataInput(BaseModel):
     battery: int = 0
     timestamp: int = 0
     connected: bool = False
+    user_id: int = 1  # Dynamic user ID
 
 
 @app.post("/watch/data")
@@ -477,7 +478,7 @@ async def receive_watch_data(data: WatchDataInput, db: Session = Depends(get_db)
             risk = "HIGH" if data.hr > 150 else ("MODERATE" if data.hr > 120 else "LOW")
             
             health_metric = HealthMetric(
-                user_id=1,  # Default user
+                user_id=data.user_id,  # Dynamic user ID
                 timestamp=int(data.timestamp or time.time()),
                 date=now.strftime("%Y-%m-%d"),
                 heart_rate=data.hr if data.hr > 0 else None,
@@ -901,6 +902,12 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    # Update watch service with current user ID
+    if WATCH_SERVICE_AVAILABLE:
+        service = get_watch_service()
+        service.current_user_id = user.id
+        print(f"📡 Watch service updated for user {user.id}")
 
     return user
 

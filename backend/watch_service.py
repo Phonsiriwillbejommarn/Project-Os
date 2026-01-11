@@ -58,6 +58,9 @@ class AolonRealTimeService:
         self.steps = 0
         self.last_update = 0
         
+        # Current user ID (dynamic - set when user logs in)
+        self.current_user_id = 1  # Default, will be updated on user login
+        
         # Database save tracking
         self._last_save_time = 0
         self._save_interval = 60  # Save every 60 seconds
@@ -317,7 +320,7 @@ class AolonRealTimeService:
             db = SessionLocal()
             try:
                 health_metric = HealthMetric(
-                    user_id=1,  # Default user
+                    user_id=self.current_user_id,  # Dynamic user ID
                     timestamp=int(time.time()),
                     date=now.strftime("%Y-%m-%d"),
                     heart_rate=self.current_hr if self.current_hr > 0 else None,
