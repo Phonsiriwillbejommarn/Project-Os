@@ -5,6 +5,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ChatAssistant from './components/ChatAssistant';
 import HealthDashboard from './components/HealthDashboard';
+import OverviewDashboard from './components/OverviewDashboard';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -13,14 +14,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Lightbulb,
-  Heart
+  Heart,
+  Home
 } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- State ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [foodLogs, setFoodLogs] = useState<FoodItem[]>([]);
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'health' | 'chat'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'overview' | 'dashboard' | 'health' | 'chat'>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -247,6 +249,14 @@ const App: React.FC = () => {
 
         <div className="flex md:flex-col justify-around md:justify-start md:px-4 md:space-y-2 w-full h-full md:h-auto items-center md:items-stretch">
           <button
+            onClick={() => setCurrentTab('overview')}
+            className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'overview' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
+          >
+            <Home className="w-6 h-6 md:mr-3" />
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">ภาพรวม</span>
+          </button>
+
+          <button
             onClick={() => setCurrentTab('dashboard')}
             className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'dashboard' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
           >
@@ -299,7 +309,7 @@ const App: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">
-              {currentTab === 'dashboard' ? 'โภชนาการวันนี้' : currentTab === 'health' ? 'สุขภาพของคุณ' : 'ผู้ช่วยส่วนตัว'}
+              {currentTab === 'overview' ? 'ภาพรวมวันนี้' : currentTab === 'dashboard' ? 'โภชนาการวันนี้' : currentTab === 'health' ? 'สุขภาพของคุณ' : 'ผู้ช่วยส่วนตัว'}
             </h2>
             <p className="text-gray-500 text-sm hidden sm:block">ดูแลสุขภาพของคุณในทุกๆ วัน</p>
           </div>
@@ -323,7 +333,15 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {currentTab === 'dashboard' ? (
+        {currentTab === 'overview' ? (
+          <OverviewDashboard
+            user={userProfile}
+            stats={dailyStats}
+            healthData={healthData}
+            navigateToNutrition={() => setCurrentTab('dashboard')}
+            navigateToHealth={() => setCurrentTab('health')}
+          />
+        ) : currentTab === 'dashboard' ? (
           <Dashboard
             user={userProfile}
             stats={dailyStats}
