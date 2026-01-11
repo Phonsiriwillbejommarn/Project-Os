@@ -160,7 +160,7 @@ def log_api_event(event_type: str, model_name: str, duration: int = 0):
     """บันทึก API event ลง file สำหรับดูย้อนหลัง"""
     try:
         from datetime import datetime
-        log_file = "/home/os/api_analytics.log"
+        log_file = "/home/os/Project-Os3/Project-Os/logs/api_analytics.log"
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         with open(log_file, "a", encoding="utf-8") as f:

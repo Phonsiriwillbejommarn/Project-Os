@@ -67,6 +67,7 @@ const App: React.FC = () => {
               targetProtein: userData.target_protein,
               targetCarbs: userData.target_carbs,
               targetFat: userData.target_fat,
+              stepGoal: userData.step_goal || 10000,
               dailyTips: userData.daily_tips ? JSON.parse(userData.daily_tips) : []
             };
 

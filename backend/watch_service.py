@@ -25,7 +25,7 @@ BATTERY_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
 VENDOR_STEPS_UUID = "0000fee1-0000-1000-8000-00805f9b34fb"
 
 # Log file path
-LOG_FILE = "/home/os/health_data.log"
+LOG_FILE = "/home/os/Project-Os3/Project-Os/logs/health_data.log"
 
 
 def log_health_data(hr: int, steps: int, battery: int, connected: bool, saved: bool = False):
