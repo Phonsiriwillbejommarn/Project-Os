@@ -16,12 +16,13 @@ interface OverviewDashboardProps {
         battery: number;
         fatigue_score?: number;
     } | null;
+    stepGoal: number;
     navigateToNutrition: () => void;
     navigateToHealth: () => void;
 }
 
 const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
-    user, stats, healthData, navigateToNutrition, navigateToHealth
+    user, stats, healthData, stepGoal, navigateToNutrition, navigateToHealth
 }) => {
     const [aiSummary, setAiSummary] = useState<string>('');
     const [loadingSummary, setLoadingSummary] = useState(false);
@@ -51,7 +52,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 health: {
                     heart_rate: healthData?.heart_rate || 0,
                     steps: healthData?.steps || 0,
-                    steps_goal: 10000,
+                    steps_goal: stepGoal,
                     calories_burned: healthData?.calories_burned || 0,
                     activity: healthData?.activity || 'unknown',
                     fatigue: Math.round(fatigueScore * 100)
@@ -99,10 +100,10 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
         narrative += `ส่วนการเดินวันนี้อยู่ที่ ${stepsToday.toLocaleString()} ก้าว `;
 
-        if (stepsToday >= 10000) {
+        if (stepsToday >= stepGoal) {
             narrative += `ถึงเป้าหมายแล้ว ยอดเยี่ยมครับ! `;
-        } else if (stepsToday >= 5000) {
-            narrative += `เดินอีกสัก ${(10000 - stepsToday).toLocaleString()} ก้าวจะถึงเป้าหมายครับ `;
+        } else if (stepsToday >= stepGoal / 2) {
+            narrative += `เดินอีกสัก ${(stepGoal - stepsToday).toLocaleString()} ก้าวจะถึงเป้าหมายครับ `;
         } else {
             narrative += `ลองหาเวลาเดินเพิ่มเพื่อสุขภาพที่ดีครับ `;
         }
@@ -131,15 +132,6 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">
-                    สวัสดี, {user.name || 'คุณ'}! 👋
-                </h2>
-                <p className="text-gray-500 text-sm mt-1">
-                    นี่คือสรุปภาพรวมสุขภาพและโภชนาการของคุณวันนี้
-                </p>
-            </div>
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Calories Today */}
@@ -263,15 +255,15 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     {/* Steps Progress */}
                     <div className="mb-4">
                         <div className="flex justify-between text-sm mb-2">
-                            <span className="text-gray-600">{healthData?.steps?.toLocaleString() || 0} / 10,000 ก้าว</span>
+                            <span className="text-gray-600">{healthData?.steps?.toLocaleString() || 0} / {stepGoal.toLocaleString()} ก้าว</span>
                             <span className="font-semibold text-purple-600">
-                                {Math.min(100, Math.round(((healthData?.steps || 0) / 10000) * 100))}%
+                                {Math.min(100, Math.round(((healthData?.steps || 0) / stepGoal) * 100))}%
                             </span>
                         </div>
                         <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-purple-500 rounded-full transition-all duration-500"
-                                style={{ width: `${Math.min(100, ((healthData?.steps || 0) / 10000) * 100)}%` }}
+                                style={{ width: `${Math.min(100, ((healthData?.steps || 0) / stepGoal) * 100)}%` }}
                             />
                         </div>
                     </div>

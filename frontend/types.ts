@@ -36,6 +36,7 @@ export interface UserProfile {
   targetProtein?: number;
   targetCarbs?: number;
   targetFat?: number;
+  stepGoal?: number;
   dailyTips?: string[];
 }
 

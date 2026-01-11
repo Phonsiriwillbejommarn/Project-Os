@@ -338,6 +338,7 @@ const App: React.FC = () => {
             user={userProfile}
             stats={dailyStats}
             healthData={healthData}
+            stepGoal={userProfile.stepGoal || 10000}
             navigateToNutrition={() => setCurrentTab('dashboard')}
             navigateToHealth={() => setCurrentTab('health')}
           />
