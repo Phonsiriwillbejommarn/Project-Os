@@ -4,6 +4,7 @@ import Onboarding from './components/Onboarding';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ChatAssistant from './components/ChatAssistant';
+import HealthDashboard from './components/HealthDashboard';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -11,14 +12,15 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Lightbulb
+  Lightbulb,
+  Heart
 } from 'lucide-react';
 
 const App: React.FC = () => {
   // --- State ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [foodLogs, setFoodLogs] = useState<FoodItem[]>([]);
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'chat'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'health' | 'chat'>('dashboard');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -221,6 +223,14 @@ const App: React.FC = () => {
             <MessageSquare className="w-6 h-6 md:mr-3" />
             <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">AI Chat</span>
           </button>
+
+          <button
+            onClick={() => setCurrentTab('health')}
+            className={`flex flex-col md:flex-row items-center p-2 md:p-3 rounded-lg transition-colors ${currentTab === 'health' ? 'text-emerald-600 md:bg-emerald-50' : 'text-gray-400 hover:text-emerald-500'}`}
+          >
+            <Heart className="w-6 h-6 md:mr-3" />
+            <span className="text-xs md:text-sm font-medium mt-1 md:mt-0">สุขภาพ</span>
+          </button>
         </div>
 
         <div className="hidden md:block p-6 mt-auto">
@@ -251,7 +261,7 @@ const App: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">
-              {currentTab === 'dashboard' ? 'Dashboard สุขภาพ' : 'ห้องแชทโภชนาการ'}
+              {currentTab === 'dashboard' ? 'Dashboard สุขภาพ' : currentTab === 'health' ? 'Health Coach' : 'ห้องแชทโภชนาการ'}
             </h2>
             <p className="text-gray-500 text-sm hidden sm:block">ดูแลสุขภาพของคุณในทุกๆ วัน</p>
           </div>
@@ -286,6 +296,8 @@ const App: React.FC = () => {
             onRemoveLog={handleRemoveFoodLog}
             navigateToChat={() => setCurrentTab('chat')}
           />
+        ) : currentTab === 'health' ? (
+          <HealthDashboard userId={userProfile.id!} />
         ) : (
           <div className="h-full flex flex-col">
             <ChatAssistant

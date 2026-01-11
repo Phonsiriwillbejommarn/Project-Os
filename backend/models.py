@@ -117,6 +117,101 @@ class NutritionPlan(Base):
     updated_at = Column(Integer, nullable=True)     # Unix timestamp
 
 
+# ============================================================
+# Health Monitoring Models (Pi Health Coach)
+# ============================================================
+
+class HealthMetric(Base):
+    """เก็บข้อมูลสุขภาพแบบ Real-time จากนาฬิกา Aolon"""
+    __tablename__ = "health_metrics"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    timestamp = Column(Integer, nullable=False)  # Unix timestamp
+    date = Column(String(10), nullable=False)    # YYYY-MM-DD
+    
+    # Vital Signs
+    heart_rate = Column(Integer, nullable=True)      # BPM
+    spo2 = Column(Integer, nullable=True)            # Blood oxygen %
+    blood_pressure_sys = Column(Integer, nullable=True)
+    blood_pressure_dia = Column(Integer, nullable=True)
+    
+    # Activity
+    steps = Column(Integer, default=0)
+    calories_burned = Column(Float, default=0)
+    distance = Column(Float, default=0)              # meters
+    activity_type = Column(String(50), nullable=True)  # walking, running, etc.
+    
+    # Sleep (if available)
+    sleep_quality = Column(Integer, nullable=True)   # 0-100
+    
+    # HRV Analysis (Pi คำนวณ)
+    hrv_sdnn = Column(Float, nullable=True)
+    hrv_rmssd = Column(Float, nullable=True)
+    stress_index = Column(Float, nullable=True)
+    
+    # ML Predictions (Pi คำนวณ)
+    fatigue_score = Column(Float, nullable=True)
+    vo2_max = Column(Float, nullable=True)
+    health_risk_level = Column(String(20), nullable=True)  # LOW, MODERATE, HIGH
+
+
+class WorkoutSession(Base):
+    """เก็บ session การออกกำลังกาย"""
+    __tablename__ = "workout_sessions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    date = Column(String(10), nullable=False)        # YYYY-MM-DD
+    start_time = Column(Integer, nullable=False)     # Unix timestamp
+    end_time = Column(Integer, nullable=True)        # Unix timestamp
+    duration_minutes = Column(Integer, nullable=True)
+    
+    # Workout details
+    activity_type = Column(String(50), nullable=False)  # running, walking, cycling, etc.
+    
+    # Heart rate stats
+    avg_heart_rate = Column(Integer, nullable=True)
+    max_heart_rate = Column(Integer, nullable=True)
+    min_heart_rate = Column(Integer, nullable=True)
+    
+    # Performance metrics (Pi คำนวณ)
+    calories_burned = Column(Float, nullable=True)
+    distance = Column(Float, nullable=True)          # meters
+    steps = Column(Integer, nullable=True)
+    vo2_max = Column(Float, nullable=True)
+    fatigue_score = Column(Float, nullable=True)
+    
+    # HRV during workout
+    avg_hrv_rmssd = Column(Float, nullable=True)
+    
+    # Summary from AI
+    ai_summary = Column(Text, nullable=True)
+
+
+class HealthAlert(Base):
+    """เก็บ Alert/Notification ที่ Pi สร้าง"""
+    __tablename__ = "health_alerts"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    timestamp = Column(Integer, nullable=False)      # Unix timestamp
+    date = Column(String(10), nullable=False)        # YYYY-MM-DD
+    
+    # Alert details
+    alert_type = Column(String(50), nullable=False)  # ANOMALY, FATIGUE, RECOMMENDATION, NUTRITION
+    priority = Column(String(20), default="NORMAL")  # LOW, NORMAL, HIGH, CRITICAL
+    message = Column(Text, nullable=False)           # Thai message
+    message_en = Column(Text, nullable=True)         # English message
+    
+    # Related data (JSON)
+    data = Column(Text, nullable=True)
+    
+    # Status
+    acknowledged = Column(Integer, default=0)        # 0=unread, 1=read
+    acknowledged_at = Column(Integer, nullable=True) # Unix timestamp
+
+
 # Database setup
 DATABASE_URL = "sqlite:///./nutrifriend.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
