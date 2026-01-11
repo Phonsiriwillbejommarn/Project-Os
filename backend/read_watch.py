@@ -1,4 +1,4 @@
-#!/home/os/Project-Os3/Project-Os/backend/.venv/bin/python3
+#!/home/os/Project-Os3/Project-Os/backend/venv/bin/python3
 """
 Crontab Watch Reader - อ่านข้อมูลจาก Aolon Watch ทุก 1 นาที
 
