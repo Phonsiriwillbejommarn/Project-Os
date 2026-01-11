@@ -509,6 +509,54 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                 </div>
             )}
 
+            {/* Step Goal Settings - Moved above chart */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                    <Settings className="w-5 h-5 mr-2 text-gray-500" />
+                    ตั้งค่าเป้าหมาย
+                </h3>
+
+                <div className="flex items-center justify-between">
+                    <div>
+                        <label className="text-sm text-gray-600">เป้าหมายก้าวเดินต่อวัน</label>
+                        <p className="text-xs text-gray-400">แนะนำ: 8,000 - 12,000 ก้าว</p>
+                    </div>
+
+                    {editingStepGoal ? (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                value={tempStepGoal}
+                                onChange={(e) => setTempStepGoal(parseInt(e.target.value) || 0)}
+                                className="w-24 px-3 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500"
+                                min={1000}
+                                max={50000}
+                                step={1000}
+                            />
+                            <button
+                                onClick={() => {
+                                    onStepGoalChange(tempStepGoal);
+                                    setEditingStepGoal(false);
+                                }}
+                                className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                            >
+                                <Save className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                setTempStepGoal(stepGoal);
+                                setEditingStepGoal(true);
+                            }}
+                            className="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 hover:bg-gray-200 font-medium"
+                        >
+                            {stepGoal.toLocaleString()} ก้าว
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Walking Statistics - Bar Chart */}
             {healthHistory && (
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -619,54 +667,6 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                     </div>
                 </div>
             )}
-
-            {/* Step Goal Settings */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                    <Settings className="w-5 h-5 mr-2 text-gray-500" />
-                    ตั้งค่าเป้าหมาย
-                </h3>
-
-                <div className="flex items-center justify-between">
-                    <div>
-                        <label className="text-sm text-gray-600">เป้าหมายก้าวเดินต่อวัน</label>
-                        <p className="text-xs text-gray-400">แนะนำ: 8,000 - 12,000 ก้าว</p>
-                    </div>
-
-                    {editingStepGoal ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                value={tempStepGoal}
-                                onChange={(e) => setTempStepGoal(parseInt(e.target.value) || 0)}
-                                className="w-24 px-3 py-2 border rounded-lg text-right focus:ring-2 focus:ring-blue-500"
-                                min={1000}
-                                max={50000}
-                                step={1000}
-                            />
-                            <button
-                                onClick={() => {
-                                    onStepGoalChange(tempStepGoal);
-                                    setEditingStepGoal(false);
-                                }}
-                                className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                            >
-                                <Save className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => {
-                                setTempStepGoal(stepGoal);
-                                setEditingStepGoal(true);
-                            }}
-                            className="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 hover:bg-gray-200 font-medium"
-                        >
-                            {stepGoal.toLocaleString()} ก้าว
-                        </button>
-                    )}
-                </div>
-            </div>
 
             {/* Processing Info */}
             <div className="text-center text-xs text-gray-400">
