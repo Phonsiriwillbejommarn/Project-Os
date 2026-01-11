@@ -42,7 +42,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                 setWatchStatus(data);
                 setConnected(data.connected);
 
-                if (data.connected && data.hr > 0) {
+                if (data.connected && (data.steps > 0 || data.battery > 0)) {
                     // Convert watch data to HealthData format
                     const watchHealth: HealthData = {
                         timestamp: data.last_update || Date.now() / 1000,
@@ -50,12 +50,12 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                         steps: data.steps,
                         activity: data.hr < 80 ? 'resting' : data.hr < 100 ? 'walking' : 'light_exercise',
                         anomaly_detected: false,
-                        fatigue_score: Math.min(1, (data.hr - 60) / 100),
+                        fatigue_score: data.hr > 0 ? Math.min(1, (data.hr - 60) / 100) : 0,
                         calories_burned: data.steps * 0.04,
                         hr_zone: {
                             zone: data.hr < 100 ? 1 : data.hr < 120 ? 2 : data.hr < 140 ? 3 : 4,
                             name: data.hr < 100 ? 'พักผ่อน' : data.hr < 120 ? 'เผาผลาญไขมัน' : data.hr < 140 ? 'คาร์ดิโอ' : 'Peak',
-                            hr_percent: (data.hr / 190) * 100
+                            hr_percent: data.hr > 0 ? (data.hr / 190) * 100 : 0
                         },
                         health_risk_level: data.hr > 150 ? 'MODERATE' : 'LOW',
                         processing_time_ms: 0
