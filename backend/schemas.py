@@ -28,6 +28,9 @@ class UserProfileResponse(UserProfileCreate):
     target_fat: Optional[float] = None
     step_goal: Optional[int] = 10000
     daily_tips: Optional[str] = None
+    start_weight: Optional[float] = None
+    target_weight: Optional[float] = None
+    registration_date: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -50,6 +53,9 @@ class UserProfileUpdate(BaseModel):
     target_fat: Optional[float] = None
     step_goal: Optional[int] = None
     daily_tips: Optional[str] = None
+    start_weight: Optional[float] = None
+    target_weight: Optional[float] = None
+    registration_date: Optional[str] = None
 
 
 # Food Item Schemas
