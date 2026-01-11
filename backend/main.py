@@ -863,6 +863,19 @@ def create_user(user: UserProfileCreate, db: Session = Depends(get_db), req: Req
             print(f"AI Assessment failed: {e}")
             ai_assessment = "ขออภัย ไม่สามารถวิเคราะห์ข้อมูลได้ในขณะนี้"
 
+    from datetime import datetime
+    
+    # Calculate target weight based on goal
+    target_weight = None
+    if user.goal == "LoseWeight":
+        # Default: lose 10% of body weight
+        target_weight = round(user.weight * 0.9, 1)
+    elif user.goal == "GainWeight":
+        # Default: gain 10% of body weight
+        target_weight = round(user.weight * 1.1, 1)
+    else:
+        target_weight = user.weight
+    
     db_user = UserProfile(
         username=user.username,
         password=user.password,
@@ -881,7 +894,11 @@ def create_user(user: UserProfileCreate, db: Session = Depends(get_db), req: Req
         target_protein=target_protein,
         target_carbs=target_carbs,
         target_fat=target_fat,
-        daily_tips=daily_tips
+        daily_tips=daily_tips,
+        # Long-term goal tracking
+        start_weight=user.weight,
+        target_weight=target_weight,
+        registration_date=datetime.now().strftime("%Y-%m-%d")
     )
     try:
         db.add(db_user)
@@ -2066,6 +2083,113 @@ def get_health_stats(user_id: int, db: Session = Depends(get_db)):
         "unread_alerts": unread_alerts,
         "engine_stats": engine_stats,
         "connection_status": "connected" if user_id in ws_manager.active_connections else "disconnected"
+    }
+
+
+@app.get("/users/{user_id}/goal-progress")
+def get_goal_progress(user_id: int, db: Session = Depends(get_db)):
+    """Get long-term goal progress for user"""
+    from datetime import datetime, timedelta
+    
+    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if we have the necessary data
+    if not user.registration_date or not user.target_timeline:
+        return {
+            "available": False,
+            "message": "ไม่มีข้อมูลระยะเวลาเป้าหมาย กรุณาตั้งค่าใหม่"
+        }
+    
+    # Parse timeline to weeks
+    timeline_weeks = 52  # Default 1 year
+    timeline = user.target_timeline.lower() if user.target_timeline else ""
+    if "1 week" in timeline or "1 สัปดาห์" in timeline:
+        timeline_weeks = 1
+    elif "2 week" in timeline or "2 สัปดาห์" in timeline:
+        timeline_weeks = 2
+    elif "1 month" in timeline or "1 เดือน" in timeline:
+        timeline_weeks = 4
+    elif "3 month" in timeline or "3 เดือน" in timeline:
+        timeline_weeks = 13
+    elif "6 month" in timeline or "6 เดือน" in timeline:
+        timeline_weeks = 26
+    elif "1 year" in timeline or "1 ปี" in timeline:
+        timeline_weeks = 52
+    
+    # Calculate weeks elapsed
+    try:
+        reg_date = datetime.strptime(user.registration_date, "%Y-%m-%d")
+        today = datetime.now()
+        days_elapsed = (today - reg_date).days
+        weeks_elapsed = max(1, days_elapsed // 7)
+    except:
+        weeks_elapsed = 1
+    
+    # Get weights
+    start_weight = user.start_weight or user.weight
+    target_weight = user.target_weight or user.weight
+    current_weight = user.weight
+    
+    # Calculate weight change needed
+    weight_to_change = start_weight - target_weight  # Positive = lose, Negative = gain
+    weight_changed = start_weight - current_weight
+    
+    # Calculate progress percentage
+    if abs(weight_to_change) > 0:
+        progress_percent = min(100, max(0, (weight_changed / weight_to_change) * 100))
+    else:
+        progress_percent = 100
+    
+    # Calculate expected weight at this point
+    weight_per_week = weight_to_change / timeline_weeks if timeline_weeks > 0 else 0
+    expected_weight = start_weight - (weight_per_week * weeks_elapsed)
+    
+    # Check if on track
+    if user.goal == "LoseWeight":
+        on_track = current_weight <= expected_weight + 0.5  # Allow 0.5kg tolerance
+    elif user.goal == "GainWeight":
+        on_track = current_weight >= expected_weight - 0.5
+    else:
+        on_track = True
+    
+    # Generate milestones (quarterly)
+    milestones = []
+    for quarter in [1, 2, 3, 4]:
+        week = int(timeline_weeks * quarter / 4)
+        milestone_weight = round(start_weight - (weight_per_week * week), 1)
+        milestones.append({
+            "week": week,
+            "month": int(week / 4),
+            "target_weight": milestone_weight,
+            "achieved": weeks_elapsed >= week and (
+                (user.goal == "LoseWeight" and current_weight <= milestone_weight) or
+                (user.goal == "GainWeight" and current_weight >= milestone_weight) or
+                (user.goal == "MaintainWeight")
+            )
+        })
+    
+    # Calculate time remaining
+    weeks_remaining = max(0, timeline_weeks - weeks_elapsed)
+    
+    return {
+        "available": True,
+        "goal": user.goal,
+        "start_weight": start_weight,
+        "current_weight": current_weight,
+        "target_weight": target_weight,
+        "timeline": user.target_timeline,
+        "timeline_weeks": timeline_weeks,
+        "weeks_elapsed": weeks_elapsed,
+        "weeks_remaining": weeks_remaining,
+        "progress_percent": round(progress_percent, 1),
+        "expected_weight_now": round(expected_weight, 1),
+        "on_track": on_track,
+        "weight_changed": round(weight_changed, 1),
+        "weight_remaining": round(abs(target_weight - current_weight), 1),
+        "milestones": milestones,
+        "registration_date": user.registration_date
     }
 
 # ============================================================

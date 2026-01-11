@@ -55,6 +55,11 @@ class UserProfile(Base):
     target_fat = Column(Float, nullable=True)
     step_goal = Column(Integer, default=10000)  # เป้าหมายก้าวเดินต่อวัน
     daily_tips = Column(Text, default="[]")  # JSON string
+    
+    # Long-term goal tracking
+    start_weight = Column(Float, nullable=True)  # น้ำหนักตอนสมัคร
+    target_weight = Column(Float, nullable=True)  # น้ำหนักเป้าหมาย
+    registration_date = Column(String(10), nullable=True)  # วันที่สมัคร YYYY-MM-DD
 
 
 class FoodItem(Base):
