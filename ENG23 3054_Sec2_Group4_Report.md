@@ -126,8 +126,9 @@
 2.  วสันต์ ลิ่วลมไพศาล. (2022). *SQLite ฐานข้อมูลขนาดเล็กที่ศักยภาพมากกว่าที่คิด*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.mfec.co.th/tech-talk/sqlite
 3.  Rina Diane Caballar IBM. (2024). *Google Gemini คืออะไร?*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.ibm.com/think/topics/google-gemini
 4.  bleak. (2025). *Bluetooth Bleak*. สืบข้อเมื่อ 11 มกราคม 2569, จาก https://bleak.readthedocs.io/en/latest/
-5.  Manuals+. (2024). *คู่มือการใช้งานสมาร์ทวอทช์ Aolon GT5 Pro Aolon GT5 Pro*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://manuals.plus/th/aolon/gt5-pro-smart-watch-manual-3#aolon_gt5_pro_smart_watch
-6.  Medscape. (2020). *Mifflin-St Jeor Equation*. สืบค้นเมื่อ 12 มกราคม 2569, จาก https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation?
+5.  Aolon Thailand Official Shop. (2024). *นาฬิกา Aolon curve 2.01*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://shopee.co.th/product/1230428953/25623808933
+6.  Medscape. (2020). *Mifflin-St Jeor Equation*. สืบค้นเมื่อ 12 มกราคม 2569, จาก https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation
+
 
 
 
