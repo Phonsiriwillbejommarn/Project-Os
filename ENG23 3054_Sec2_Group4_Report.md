@@ -113,7 +113,7 @@
 ### 5.2 ปัญหาและข้อเสนอแนะ
 * **ปัญหาที่พบ:**
 1. ข้อจำกัดของนาฬิกา Aolon curve 2.01 คือจะตัดสัญญาณ Bluetooth
-2. Raspberry Pi ในขณะที่ยังเสียบปลั๊กอยู่แต่สัญญาณเครือข่ายหายไป
+2. Raspberry Pi ในขณะที่ยังเสียบปลั๊กอยู่ แต่เกิดปัญหาคือสัญญาณเครือข่ายหายไป
 * **ข้อเสนอแนะ:** 
 1. ควรเลือกใช้ Raspberry Pi เวอร์ชั่นใหม่เพราะจะทำให้การประมวลผลรวดเร็วขึ้น
 2. ควรใช้ Wi-Fi ที่มีความเสถียรเพื่อทำให้อุปกรณ์ทำงานได้อย่างเต็มที่
@@ -128,6 +128,7 @@
 4.  bleak. (2025). *Bluetooth Bleak*. สืบข้อเมื่อ 11 มกราคม 2569, จาก https://bleak.readthedocs.io/en/latest/
 5.  Aolon Thailand Official Shop. (2024). *นาฬิกา Aolon curve 2.01*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://shopee.co.th/product/1230428953/25623808933
 6.  Medscape. (2025). *Mifflin-St Jeor Equation*. สืบค้นเมื่อ 12 มกราคม 2569, จาก https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation
+
 
 
 
