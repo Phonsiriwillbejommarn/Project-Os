@@ -123,11 +123,12 @@
 ## เอกสารอ้างอิง
 
 1.  Choonewza. (2018). *การติดตั้งและตั้งค่าระบบ Raspberry Pi 3 Model B+*. สืบค้นเมื่อ 6 มกราคม 2569, จาก https://choonewza.medium.com/
-2.  วสันต์ ลิ่วลมไพศาล. (2022). *SQLite ฐานข้อมูลขนาดเล็กที่ศักยภาพมากกว่าที่คิด*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.mfec.co.th/tech-talk/sqlite
+2.  วสันต์ ลิ่วลมไพศาล. (2022). *SQLite ฐานข้อมูลขนาดเล็กที่ศักยภาพมากกว่าที่คิด*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.mfec.co.th/tech-talk/sqlite-
 3.  Rina Diane Caballar IBM. (2024). *Google Gemini คืออะไร?*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://www.ibm.com/think/topics/google-gemini
 4.  bleak. (2025). *Bluetooth Bleak*. สืบข้อเมื่อ 11 มกราคม 2569, จาก https://bleak.readthedocs.io/en/latest/
 5.  Aolon Thailand Official Shop. (2024). *นาฬิกา Aolon curve 2.01*. สืบค้นเมื่อ 11 มกราคม 2569, จาก https://shopee.co.th/product/1230428953/25623808933
-6.  Medscape. (2020). *Mifflin-St Jeor Equation*. สืบค้นเมื่อ 12 มกราคม 2569, จาก https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation
+6.  Medscape. (2025). *Mifflin-St Jeor Equation*. สืบค้นเมื่อ 12 มกราคม 2569, จาก https://reference.medscape.com/calculator/846/mifflin-st-jeor-equation
+
 
 
 
