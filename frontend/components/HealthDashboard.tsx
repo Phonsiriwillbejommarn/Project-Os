@@ -286,19 +286,41 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                 intervalRef.current = setInterval(fetchWatchStatus, 5000);
             };
 
-            // Periodically send watch data to ML engine
-            intervalRef.current = setInterval(async () => {
-                await fetchWatchStatus();
-                if (watchStatus && watchStatus.hr > 0 && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        hr: watchStatus.hr,
-                        steps: watchStatus.steps,
-                        accel_x: 0,
-                        accel_y: 0,
-                        accel_z: 9.8
-                    }));
+            // Periodically fetch watch data and send to ML engine via WebSocket
+            const sendWatchDataToML = async () => {
+                try {
+                    const res = await fetch('/watch/status');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.connected && data.hr > 0 && ws.readyState === WebSocket.OPEN) {
+                            // Send to ML Engine via WebSocket
+                            ws.send(JSON.stringify({
+                                hr: data.hr,
+                                steps: data.steps,
+                                accel_x: 0,
+                                accel_y: 0,
+                                accel_z: 9.8
+                            }));
+
+                            // Update watch status
+                            setWatchStatus({
+                                available: true,
+                                connected: data.connected,
+                                hr: data.hr,
+                                steps: data.steps,
+                                battery: data.battery,
+                                last_update: data.last_update
+                            });
+                        }
+                    }
+                } catch (err) {
+                    // Ignore fetch errors
                 }
-            }, 2000);
+            };
+
+            // Send immediately on connect and then every 1 second
+            sendWatchDataToML();
+            intervalRef.current = setInterval(sendWatchDataToML, 1000);
         }
 
         return () => {
@@ -522,82 +544,23 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
             <div className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 p-6 rounded-2xl shadow-sm border border-purple-100">
                 <h3 className="text-lg font-semibold text-purple-700 mb-4 flex items-center">
                     <Brain className="w-5 h-5 mr-2" />
-                    Machine Learning Analysis
+                    การวิเคราะห์ขั้นสูง
                     <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-600">
-                        IsolationForest + HRV
+                        AI Detection
                     </span>
                 </h3>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {/* Anomaly Detection */}
-                    <div className={`p-4 rounded-xl ${healthData?.anomaly_detected ? 'bg-red-100 border-2 border-red-400' : 'bg-green-50 border border-green-200'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className={`w-5 h-5 ${healthData?.anomaly_detected ? 'text-red-500' : 'text-green-500'}`} />
-                            <span className="text-xs font-medium text-gray-600">Anomaly Detection</span>
-                        </div>
-                        <div className={`text-xl font-bold ${healthData?.anomaly_detected ? 'text-red-600' : 'text-green-600'}`}>
-                            {healthData?.anomaly_detected ? '⚠️ ตรวจพบ' : '✓ ปกติ'}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">IsolationForest ML</div>
+                {/* Anomaly Detection */}
+                <div className={`p-5 rounded-xl ${healthData?.anomaly_detected ? 'bg-red-100 border-2 border-red-400' : 'bg-green-50 border border-green-200'}`}>
+                    <div className="flex items-center gap-3 mb-2">
+                        <AlertTriangle className={`w-6 h-6 ${healthData?.anomaly_detected ? 'text-red-500' : 'text-green-500'}`} />
+                        <span className="text-sm font-medium text-gray-700">Anomaly Detection</span>
                     </div>
-
-                    {/* VO2 Max */}
-                    <div className="bg-white p-4 rounded-xl border border-purple-200">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Activity className="w-5 h-5 text-purple-500" />
-                            <span className="text-xs font-medium text-gray-600">VO2 Max</span>
-                        </div>
-                        <div className="text-xl font-bold text-purple-600">
-                            {healthData?.vo2_max ? `${healthData.vo2_max.toFixed(1)}` : '--'}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">ml/kg/min</div>
+                    <div className={`text-2xl font-bold ${healthData?.anomaly_detected ? 'text-red-600' : 'text-green-600'}`}>
+                        {healthData?.anomaly_detected ? '⚠️ ตรวจพบความผิดปกติ' : '✓ สถานะปกติ'}
                     </div>
-
-                    {/* HRV - Stress Index */}
-                    <div className="bg-white p-4 rounded-xl border border-indigo-200">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Heart className="w-5 h-5 text-indigo-500" />
-                            <span className="text-xs font-medium text-gray-600">Stress Index</span>
-                        </div>
-                        <div className="text-xl font-bold text-indigo-600">
-                            {healthData?.hrv?.stress_index ? `${healthData.hrv.stress_index.toFixed(0)}` : '--'}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">/100 (HRV Analysis)</div>
-                    </div>
-
-                    {/* Processing Time */}
-                    <div className="bg-white p-4 rounded-xl border border-blue-200">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Zap className="w-5 h-5 text-blue-500" />
-                            <span className="text-xs font-medium text-gray-600">Processing</span>
-                        </div>
-                        <div className="text-xl font-bold text-blue-600">
-                            {healthData?.processing_time_ms ? `${healthData.processing_time_ms.toFixed(1)}` : '--'}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">ms (Pi Local)</div>
-                    </div>
+                    <div className="text-xs text-gray-400 mt-2">ใช้ IsolationForest Machine Learning ตรวจจับค่าผิดปกติจาก Heart Rate</div>
                 </div>
-
-                {/* HRV Details */}
-                {healthData?.hrv && (
-                    <div className="mt-4 p-4 bg-white/70 rounded-xl border border-indigo-100">
-                        <div className="text-sm font-medium text-indigo-700 mb-3">📊 HRV Metrics (Heart Rate Variability)</div>
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                            <div>
-                                <div className="text-lg font-bold text-gray-700">{healthData.hrv.sdnn?.toFixed(1) || '--'}</div>
-                                <div className="text-xs text-gray-500">SDNN (ms)</div>
-                            </div>
-                            <div>
-                                <div className="text-lg font-bold text-gray-700">{healthData.hrv.rmssd?.toFixed(1) || '--'}</div>
-                                <div className="text-xs text-gray-500">RMSSD (ms)</div>
-                            </div>
-                            <div>
-                                <div className="text-lg font-bold text-gray-700">{healthData.hrv.pnn50?.toFixed(1) || '--'}%</div>
-                                <div className="text-xs text-gray-500">pNN50</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* Alerts & Decisions */}
