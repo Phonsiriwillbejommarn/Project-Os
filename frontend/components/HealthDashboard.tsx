@@ -501,7 +501,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                         {/* Activity Analysis */}
                         <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 rounded-xl">
                             <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs text-gray-500">กิจกรรมที่ AI วิเคราะห์</span>
+                                <span className="text-xs text-gray-500">กิจกรรมปัจจุบัน</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
                                     {healthData?.heart_rate && healthData.heart_rate > 0 ? 'Real-time' : 'รอข้อมูล'}
                                 </span>
@@ -554,7 +554,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                         <span className="text-sm font-medium text-gray-700">Anomaly Detection</span>
                     </div>
                     <div className={`text-2xl font-bold ${healthData?.anomaly_detected ? 'text-red-600' : 'text-green-600'}`}>
-                        {healthData?.anomaly_detected ? '⚠️ ตรวจพบความผิดปกติ' : '✓ สถานะปกติ'}
+                        {healthData?.anomaly_detected ? 'ตรวจพบความผิดปกติ' : 'สถานะปกติ'}
                     </div>
                     <div className="text-xs text-gray-400 mt-2">ตรวจจับค่าผิดปกติจากอัตราการเต้นของหัวใจ</div>
                 </div>
