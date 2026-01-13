@@ -183,57 +183,89 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
             generateMockData();
             intervalRef.current = setInterval(generateMockData, 2000);
         } else {
-            // Watch mode - use WebSocket for real-time updates
+            // Watch mode - use WebSocket for real-time ML processing
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${wsProtocol}//${window.location.host}/ws/watch`;
-
-            console.log('🔌 Connecting to WebSocket:', wsUrl);
+            // Connect to ML Health Engine endpoint
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/health/${userId}`;
 
             const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
             ws.onopen = () => {
-                console.log('✅ WebSocket connected!');
+                setConnected(true);
+                // Start sending watch data to ML engine
+                fetchWatchStatus().then(() => {
+                    if (watchStatus && watchStatus.hr > 0) {
+                        ws.send(JSON.stringify({
+                            hr: watchStatus.hr,
+                            steps: watchStatus.steps,
+                            accel_x: 0,
+                            accel_y: 0,
+                            accel_z: 9.8
+                        }));
+                    }
+                });
             };
 
             ws.onmessage = (event) => {
                 try {
-                    const data = JSON.parse(event.data);
+                    const response = JSON.parse(event.data);
 
-                    if (data.type === 'watch_update') {
+                    // Handle ML-processed health data from backend
+                    if (response.health_data) {
+                        const mlData = response.health_data;
+
+                        // Use ML-processed data directly!
+                        const mlHealthData: HealthData = {
+                            timestamp: mlData.timestamp,
+                            heart_rate: mlData.heart_rate,
+                            steps: mlData.steps,
+                            activity: mlData.activity,
+                            hrv: mlData.hrv,               // 🧠 ML: HRV Analysis
+                            anomaly_detected: mlData.anomaly_detected,  // 🧠 ML: IsolationForest
+                            fatigue_score: mlData.fatigue_score,        // 🧠 ML: Fatigue Prediction
+                            vo2_max: mlData.vo2_max,       // 🧠 ML: VO2 Max Estimation
+                            calories_burned: mlData.calories_burned,    // 🧠 ML: Advanced Calorie
+                            hr_zone: mlData.hr_zone,
+                            health_risk_level: mlData.health_risk_level,
+                            processing_time_ms: mlData.processing_time_ms
+                        };
+
+                        setHealthData(mlHealthData);
+                        setConnected(true);
+
+                        setSummary({
+                            avg_heart_rate: mlData.heart_rate,
+                            total_steps: mlData.steps,
+                            total_calories: mlData.calories_burned
+                        });
+
+                        // Handle AI decisions/alerts
+                        if (response.decisions && response.decisions.length > 0) {
+                            setDecisions(response.decisions);
+                        }
+                    }
+
+                    // Also handle legacy watch_update format for compatibility
+                    if (response.type === 'watch_update') {
                         setWatchStatus({
                             available: true,
-                            connected: data.connected,
-                            hr: data.hr,
-                            steps: data.steps,
-                            battery: data.battery,
-                            last_update: data.last_update
+                            connected: response.connected,
+                            hr: response.hr,
+                            steps: response.steps,
+                            battery: response.battery,
+                            last_update: response.last_update
                         });
-                        setConnected(data.connected);
 
-                        if (data.steps > 0 || data.battery > 0) {
-                            const watchHealth: HealthData = {
-                                timestamp: data.last_update || Date.now() / 1000,
-                                heart_rate: data.hr,
-                                steps: data.steps,
-                                activity: data.hr < 80 ? 'resting' : data.hr < 100 ? 'walking' : 'light_exercise',
-                                anomaly_detected: false,
-                                fatigue_score: data.hr > 0 ? Math.min(1, (data.hr - 60) / 100) : 0,
-                                calories_burned: data.steps * 0.04,
-                                hr_zone: {
-                                    zone: data.hr < 100 ? 1 : data.hr < 120 ? 2 : data.hr < 140 ? 3 : 4,
-                                    name: data.hr < 100 ? 'พักผ่อน' : data.hr < 120 ? 'เผาผลาญไขมัน' : data.hr < 140 ? 'คาร์ดิโอ' : 'Peak',
-                                    hr_percent: data.hr > 0 ? (data.hr / 190) * 100 : 0
-                                },
-                                health_risk_level: data.hr > 150 ? 'MODERATE' : 'LOW',
-                                processing_time_ms: 0
-                            };
-                            setHealthData(watchHealth);
-                            setSummary({
-                                avg_heart_rate: data.hr,
-                                total_steps: data.steps,
-                                total_calories: data.steps * 0.04
-                            });
+                        // Send to ML engine for processing
+                        if (response.hr > 0 && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                hr: response.hr,
+                                steps: response.steps,
+                                accel_x: 0,
+                                accel_y: 0,
+                                accel_z: 9.8
+                            }));
                         }
                     }
                 } catch (err) {
@@ -241,19 +273,32 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                 }
             };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                // Fallback to HTTP polling
+            ws.onerror = () => {
+                // Fallback to HTTP polling (no ML processing)
                 fetchWatchStatus();
                 intervalRef.current = setInterval(fetchWatchStatus, 5000);
             };
 
             ws.onclose = () => {
-                console.log('🔌 WebSocket closed, falling back to HTTP polling');
+                setConnected(false);
                 // Fallback to HTTP polling if still in watch mode
                 fetchWatchStatus();
                 intervalRef.current = setInterval(fetchWatchStatus, 5000);
             };
+
+            // Periodically send watch data to ML engine
+            intervalRef.current = setInterval(async () => {
+                await fetchWatchStatus();
+                if (watchStatus && watchStatus.hr > 0 && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        hr: watchStatus.hr,
+                        steps: watchStatus.steps,
+                        accel_x: 0,
+                        accel_y: 0,
+                        accel_z: 9.8
+                    }));
+                }
+            }, 2000);
         }
 
         return () => {
