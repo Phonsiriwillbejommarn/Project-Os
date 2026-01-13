@@ -340,8 +340,8 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-sm hidden sm:block">ดูแลสุขภาพของคุณในทุกๆ วัน</p>
           </div>
 
-          {/* Date picker - only show on dashboard tab */}
-          {currentTab === 'dashboard' && (
+          {/* Date picker - only show on dashboard and chat tabs */}
+          {(currentTab === 'dashboard' || currentTab === 'chat') && (
             <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
               <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
                 <ChevronLeft className="w-5 h-5" />
