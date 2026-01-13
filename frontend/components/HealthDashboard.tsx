@@ -544,10 +544,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
             <div className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 p-6 rounded-2xl shadow-sm border border-purple-100">
                 <h3 className="text-lg font-semibold text-purple-700 mb-4 flex items-center">
                     <Brain className="w-5 h-5 mr-2" />
-                    การวิเคราะห์ขั้นสูง
-                    <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-600">
-                        AI Detection
-                    </span>
+                    วิเคราะห์ Heart Rate
                 </h3>
 
                 {/* Anomaly Detection */}
@@ -559,7 +556,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId, stepGoal, onS
                     <div className={`text-2xl font-bold ${healthData?.anomaly_detected ? 'text-red-600' : 'text-green-600'}`}>
                         {healthData?.anomaly_detected ? '⚠️ ตรวจพบความผิดปกติ' : '✓ สถานะปกติ'}
                     </div>
-                    <div className="text-xs text-gray-400 mt-2">ใช้ IsolationForest Machine Learning ตรวจจับค่าผิดปกติจาก Heart Rate</div>
+                    <div className="text-xs text-gray-400 mt-2">ตรวจจับค่าผิดปกติจากอัตราการเต้นของหัวใจ</div>
                 </div>
             </div>
 
