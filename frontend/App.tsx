@@ -340,23 +340,26 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-sm hidden sm:block">ดูแลสุขภาพของคุณในทุกๆ วัน</p>
           </div>
 
-          <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
-            <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center px-4 border-x border-gray-100">
-              <Calendar className="w-4 h-4 text-emerald-500 mr-2" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="text-sm font-medium text-gray-700 focus:outline-none bg-transparent"
-              />
+          {/* Date picker - only show on dashboard tab */}
+          {currentTab === 'dashboard' && (
+            <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+              <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center px-4 border-x border-gray-100">
+                <Calendar className="w-4 h-4 text-emerald-500 mr-2" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="text-sm font-medium text-gray-700 focus:outline-none bg-transparent"
+                />
+              </div>
+              <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
-            <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 rounded-md text-gray-600">
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          )}
         </div>
 
         {currentTab === 'overview' ? (
