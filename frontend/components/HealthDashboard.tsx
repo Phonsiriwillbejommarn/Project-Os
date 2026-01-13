@@ -28,6 +28,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
     const [mode, setMode] = useState<'mock' | 'watch'>('mock');
     const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null);
     const [connecting, setConnecting] = useState(false);
+    const [demoAnomaly, setDemoAnomaly] = useState(false);
 
     // Refs
     const wsRef = useRef<WebSocket | null>(null);
@@ -93,28 +94,28 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
 
     // Generate mock data for demo
     const generateMockData = useCallback(() => {
-        const baseHr = 70 + Math.floor(Math.random() * 30);
+        const baseHr = demoAnomaly ? 185 + Math.floor(Math.random() * 20) : 70 + Math.floor(Math.random() * 30);
         const mockHealth: HealthData = {
             timestamp: Date.now() / 1000,
             heart_rate: baseHr,
             steps: 5000 + Math.floor(Math.random() * 3000),
-            activity: ['resting', 'walking', 'light_exercise'][Math.floor(Math.random() * 3)],
+            activity: demoAnomaly ? 'intense_exercise' : ['resting', 'walking', 'light_exercise'][Math.floor(Math.random() * 3)],
             hrv: {
-                sdnn: 40 + Math.random() * 30,
-                rmssd: 30 + Math.random() * 25,
+                sdnn: demoAnomaly ? 15 + Math.random() * 10 : 40 + Math.random() * 30,
+                rmssd: demoAnomaly ? 10 + Math.random() * 10 : 30 + Math.random() * 25,
                 pnn50: 10 + Math.random() * 20,
-                stress_index: 30 + Math.random() * 40
+                stress_index: demoAnomaly ? 80 + Math.random() * 15 : 30 + Math.random() * 40
             },
-            anomaly_detected: false,
-            fatigue_score: 0.2 + Math.random() * 0.4,
+            anomaly_detected: demoAnomaly,
+            fatigue_score: demoAnomaly ? 0.85 + Math.random() * 0.1 : 0.2 + Math.random() * 0.4,
             vo2_max: 35 + Math.random() * 15,
             calories_burned: 200 + Math.random() * 300,
             hr_zone: {
-                zone: baseHr < 100 ? 1 : baseHr < 120 ? 2 : 3,
-                name: baseHr < 100 ? 'พักผ่อน' : baseHr < 120 ? 'เผาผลาญไขมัน' : 'คาร์ดิโอ',
+                zone: demoAnomaly ? 5 : (baseHr < 100 ? 1 : baseHr < 120 ? 2 : 3),
+                name: demoAnomaly ? 'ความเข้มสูงสุด (Max)' : (baseHr < 100 ? 'พักผ่อน' : baseHr < 120 ? 'เผาผลาญไขมัน' : 'คาร์ดิโอ'),
                 hr_percent: (baseHr / 190) * 100
             },
-            health_risk_level: 'LOW',
+            health_risk_level: demoAnomaly ? 'HIGH' : 'LOW',
             processing_time_ms: 5 + Math.random() * 10
         };
 
@@ -126,7 +127,7 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
             total_steps: mockHealth.steps,
             total_calories: mockHealth.calories_burned
         });
-    }, []);
+    }, [demoAnomaly]);
 
     // Mode effect
     useEffect(() => {
@@ -219,8 +220,30 @@ const HealthDashboard: React.FC<HealthDashboardProps> = ({ userId }) => {
                         {mode === 'mock' ? <WifiOff size={16} /> : <Watch size={16} />}
                         {mode === 'mock' ? 'Mock Mode' : 'Watch Mode'}
                     </button>
+
                 </div>
             </div>
+
+            {/* 🚨 Anomaly Detection Alert Banner (ML Result) */}
+            {healthData?.anomaly_detected && (
+                <div className="bg-red-600 text-white p-4 rounded-2xl shadow-lg border-2 border-red-400 animate-pulse">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <AlertTriangle className="w-8 h-8" />
+                            <div>
+                                <div className="font-bold text-lg">⚠️ ตรวจพบความผิดปกติ! (Anomaly Detected)</div>
+                                <div className="text-sm opacity-90">
+                                    ML Model (Isolation Forest) ตรวจพบรูปแบบหัวใจที่ผิดปกติ - HR: {healthData.heart_rate} BPM
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-xs opacity-75">Edge AI Processing</div>
+                            <div className="text-sm font-mono">{healthData.processing_time_ms?.toFixed(2)} ms</div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main Health Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
